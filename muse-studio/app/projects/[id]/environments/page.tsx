@@ -2,7 +2,9 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { getProjectById } from '@/lib/actions/projects';
-import { ChevronLeft, MapPin } from 'lucide-react';
+import { listEnvironments } from '@/lib/actions/environments';
+import { EnvironmentsPageClient } from '@/components/environments/EnvironmentsPageClient';
+import { ChevronLeft } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +15,10 @@ interface PageProps {
 export default async function ProjectEnvironmentsPage({ params }: PageProps) {
   const { id } = await params;
 
-  const project = await getProjectById(id);
+  const [project, environments] = await Promise.all([
+    getProjectById(id),
+    listEnvironments(id),
+  ]);
 
   if (!project) notFound();
 
@@ -47,20 +52,11 @@ export default async function ProjectEnvironmentsPage({ params }: PageProps) {
         <span className="text-xs font-medium text-foreground">Environments</span>
       </div>
 
-      {/* Placeholder */}
-      <div className="flex flex-1 items-center justify-center">
-        <div className="flex flex-col items-center gap-3 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-500/15">
-            <MapPin className="h-6 w-6 text-violet-300" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-foreground">Environments</p>
-            <p className="mt-1 text-xs text-muted-foreground/70">
-              This feature is under construction.
-            </p>
-          </div>
-        </div>
-      </div>
+      <EnvironmentsPageClient
+        projectId={id}
+        projectTitle={project.title}
+        initialEnvironments={environments}
+      />
     </div>
   );
 }
