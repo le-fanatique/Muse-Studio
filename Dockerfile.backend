@@ -1,0 +1,20 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+    git ffmpeg curl build-essential cmake \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY muse_backend ./muse_backend
+COPY muse-studio ./muse-studio
+COPY packages ./packages
+
+WORKDIR /app/muse_backend
+
+RUN pip install --upgrade pip
+RUN pip install -r requirements.txt
+
+EXPOSE 8000
+
+CMD ["python", "run.py"]
