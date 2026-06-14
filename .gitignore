@@ -1,35 +1,171 @@
+# ============================================================
 # Secrets & credentials (never commit)
+# ============================================================
+
 *.pem
 *.key
 *.p12
 *token*.json
 *credentials*.json
 service-account*.json
+
+.env
+.env.*
+!.env.example
+
 muse_backend/.env
 muse_backend/.env.*
 !muse_backend/.env.example
+
 muse-studio/.env.local
 muse-studio/.env*.local
+!muse-studio/.env.example
 
-# Node / Next.js (frontend)
+
+# ============================================================
+# Python / backend
+# ============================================================
+
+__pycache__/
+*.py[cod]
+*$py.class
+
+venv/
+.venv/
+env/
+ENV/
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+muse_backend/__pycache__/
+muse_backend/**/__pycache__/
+muse_backend/.pytest_cache/
+muse_backend/.mypy_cache/
+muse_backend/.ruff_cache/
+
+
+# ============================================================
+# Node / Next.js / frontend
+# ============================================================
+
+node_modules/
 muse-studio/node_modules/
 muse-studio/.next/
+muse-studio/out/
+muse-studio/dist/
+muse-studio/build/
 
-# Monorepo packages (Remotion, etc.)
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+
+# ============================================================
+# Monorepo packages / Remotion / generated builds
+# ============================================================
+
 packages/*/node_modules/
+packages/*/dist/
+packages/*/build/
+packages/*/.turbo/
+packages/*/.next/
 
-# Generated media & exports (videos, images, timelines)
+
+# ============================================================
+# Generated media & exports
+# ============================================================
+
 muse-studio/outputs/**
 !muse-studio/outputs/.gitignore
 
-# Local IDE (machine-specific)
+outputs/
+output/
+exports/
+renders/
+rendered/
+generated/
+tmp/
+temp/
+
+
+# ============================================================
+# AI / ComfyUI / model files
+# ============================================================
+
+models/
+checkpoints/
+loras/
+embeddings/
+vae/
+upscale_models/
+controlnet/
+diffusion_models/
+clip/
+clip_vision/
+
+*.ckpt
+*.safetensors
+*.pt
+*.pth
+*.onnx
+*.bin
+
+
+# ============================================================
+# Docker / local runtime data
+# ============================================================
+
+.docker/
+docker-data/
+docker_data/
+volumes/
+data/
+local_data/
+
+*.pid
+
+
+# ============================================================
+# Logs
+# ============================================================
+
+*.log
+logs/
+log/
+
+
+# ============================================================
+# Cache
+# ============================================================
+
+.cache/
+cache/
+.turbo/
+.eslintcache
+
+
+# ============================================================
+# Local IDE / editor / agent state
+# ============================================================
+
 .cursor/
 .skills/
 .vscode/
 
-# Logs
-*.log
+# Cline / local agent files if generated
+.cline/
+.clineignore
 
-# OS
+
+# ============================================================
+# OS / system files
+# ============================================================
+
 .DS_Store
 Thumbs.db
+desktop.ini
