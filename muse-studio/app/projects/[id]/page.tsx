@@ -14,6 +14,7 @@ import { STAGE_CONFIG } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { deriveProjectStage } from '@/lib/derive-project-stage';
 import { listCharacters } from '@/lib/actions/characters';
+import { listEnvironments } from '@/lib/actions/environments';
 import { ProjectCharactersButton } from '@/components/characters/ProjectCharactersButton';
 import { ProjectEnvironmentsButton } from '@/components/environments/ProjectEnvironmentsButton';
 
@@ -28,12 +29,13 @@ export default async function ProjectKanbanPage({ params, searchParams }: PagePr
   const { id } = await params;
   const { generating, targetScenes } = await searchParams;
 
-  const [project, llmSettings, allWorkflows, suggestions, characters] = await Promise.all([
+  const [project, llmSettings, allWorkflows, suggestions, characters, environments] = await Promise.all([
     getProjectById(id),
     getLLMSettings(),
     listComfyWorkflows(),
     listMuseSuggestions(id),
     listCharacters(id),
+    listEnvironments(id),
   ]);
 
   if (!project) notFound();
@@ -203,6 +205,7 @@ export default async function ProjectKanbanPage({ params, searchParams }: PagePr
               comfyImageWorkflows={comfyImageWorkflows}
               comfyVideoWorkflows={comfyVideoWorkflows}
               characters={characters}
+              environments={environments}
             />
           </div>
         )}

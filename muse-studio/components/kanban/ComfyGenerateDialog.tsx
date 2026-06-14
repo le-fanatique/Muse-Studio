@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { updateSceneStatus, createKeyframe, updateKeyframeOutput } from '@/lib/actions/scenes';
-import type { Scene, Character } from '@/lib/types';
+import type { Scene, Character, Environment } from '@/lib/types';
 import type { ComfyWorkflowFull, ComfyWorkflowSummary } from '@/lib/actions/comfyui';
 import {
   parseDynamicInputs,
@@ -41,6 +41,7 @@ interface ComfyGenerateDialogProps {
   onGenerationStarted?: (sceneId: string, jobId: string) => void;
   onWorkflowInvalid?: (sceneId: string, kind: 'image' | 'video') => void;
   characters?: Character[];
+  environments?: Environment[];
 }
 
 type Phase = 'loading' | 'idle' | 'submitting' | 'polling' | 'result' | 'error';
@@ -57,6 +58,7 @@ export function ComfyGenerateDialog({
   onGenerationStarted,
   onWorkflowInvalid,
   characters = [],
+  environments = [],
 }: ComfyGenerateDialogProps) {
   const router = useRouter();
 
@@ -649,6 +651,174 @@ export function ComfyGenerateDialog({
                                             <img
                                               src={img.image.url}
                                               alt={c.name}
+                                              className="h-full w-full object-cover"
+                                            />
+                                          </button>
+                                        );
+                                      }),
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                            {/* Environment image picker (for image URL) */}
+                            {environments.length > 0 &&
+                              environments.some((e) => e.images && e.images.length > 0) && (
+                                <div className="space-y-1">
+                                  <p className="text-[10px] text-muted-foreground/50">Or use environment image:</p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {environments.flatMap((e) =>
+                                      (e.images ?? []).map((img) => {
+                                        if (!img.image?.url) return [];
+                                        const isSelected =
+                                          String(inputValues[inp.nodeId] ?? '') === img.image.url;
+                                        return (
+                                          <button
+                                            key={img.id}
+                                            type="button"
+                                            onClick={() => {
+                                              setInputValue(inp.nodeId, img.image.url);
+                                            }}
+                                            className={`h-9 w-9 overflow-hidden rounded-md border transition-colors ${
+                                              isSelected
+                                                ? 'border-violet-500 ring-1 ring-violet-500/60'
+                                                : 'border-white/10 hover:border-violet-500/40'
+                                            }`}
+                                            title={`${e.name} · ${img.kind.toLowerCase()}`}
+                                          >
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img
+                                              src={img.image.url}
+                                              alt={e.name}
+                                              className="h-full w-full object-cover"
+                                            />
+                                          </button>
+                                        );
+                                      }),
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                            {/* Environment image picker (for image URL) */}
+                            {environments.length > 0 &&
+                              environments.some((e) => e.images && e.images.length > 0) && (
+                                <div className="space-y-1">
+                                  <p className="text-[10px] text-muted-foreground/50">Or use environment image:</p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {environments.flatMap((e) =>
+                                      (e.images ?? []).map((img) => {
+                                        if (!img.image?.url) return [];
+                                        const isSelected =
+                                          String(inputValues[inp.nodeId] ?? '') === img.image.url;
+                                        return (
+                                          <button
+                                            key={img.id}
+                                            type="button"
+                                            onClick={() => {
+                                              setInputValue(inp.nodeId, img.image.url);
+                                            }}
+                                            className={`h-9 w-9 overflow-hidden rounded-md border transition-colors ${
+                                              isSelected
+                                                ? 'border-violet-500 ring-1 ring-violet-500/60'
+                                                : 'border-white/10 hover:border-violet-500/40'
+                                            }`}
+                                            title={`${e.name} · ${img.kind.toLowerCase()}`}
+                                          >
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img
+                                              src={img.image.url}
+                                              alt={e.name}
+                                              className="h-full w-full object-cover"
+                                            />
+                                          </button>
+                                        );
+                                      }),
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                            {/* Environment image picker */}
+                            {environments.length > 0 &&
+                              environments.some((e) => e.images && e.images.length > 0) && (
+                                <div className="space-y-1">
+                                  <p className="text-[10px] text-muted-foreground/50">Or use environment image:</p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {environments.flatMap((e) =>
+                                      (e.images ?? []).map((img) => {
+                                        if (!img.image?.url) return [];
+
+                                        return (
+                                          <button
+                                            key={img.id}
+                                            type="button"
+                                            onClick={async () => {
+                                              const match = img.image.url.match(/\/api\/outputs\/(.+)$/);
+                                              if (match?.[1]) {
+                                                const relPath = match[1];
+                                                setFilePaths((prev) => ({ ...prev, [inp.nodeId]: relPath }));
+                                                clearFieldError(inp.nodeId);
+                                              }
+
+                                              // For preview we can use the served URL directly
+                                              setFileDataUrls((prev) => ({
+                                                ...prev,
+                                                [inp.nodeId]: img.image.url,
+                                              }));
+                                            }}
+                                            className="h-9 w-9 overflow-hidden rounded-md border border-white/10 hover:border-violet-500/40 transition-colors"
+                                            title={`${e.name} · ${img.kind.toLowerCase()}`}
+                                          >
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img
+                                              src={img.image.url}
+                                              alt={e.name}
+                                              className="h-full w-full object-cover"
+                                            />
+                                          </button>
+                                        );
+                                      }),
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                            {/* Environment image picker */}
+                            {environments.length > 0 &&
+                              environments.some((e) => e.images && e.images.length > 0) && (
+                                <div className="space-y-1">
+                                  <p className="text-[10px] text-muted-foreground/50">Or use environment image:</p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {environments.flatMap((e) =>
+                                      (e.images ?? []).map((img) => {
+                                        if (!img.image?.url) return [];
+
+                                        return (
+                                          <button
+                                            key={img.id}
+                                            type="button"
+                                            onClick={async () => {
+                                              const match = img.image.url.match(/\/api\/outputs\/(.+)$/);
+                                              if (match?.[1]) {
+                                                const relPath = match[1];
+                                                setFilePaths((prev) => ({ ...prev, [inp.nodeId]: relPath }));
+                                                clearFieldError(inp.nodeId);
+                                              }
+
+                                              // For preview we can use the served URL directly
+                                              setFileDataUrls((prev) => ({
+                                                ...prev,
+                                                [inp.nodeId]: img.image.url,
+                                              }));
+                                            }}
+                                            className="h-9 w-9 overflow-hidden rounded-md border border-white/10 hover:border-violet-500/40 transition-colors"
+                                            title={`${e.name} · ${img.kind.toLowerCase()}`}
+                                          >
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img
+                                              src={img.image.url}
+                                              alt={e.name}
                                               className="h-full w-full object-cover"
                                             />
                                           </button>

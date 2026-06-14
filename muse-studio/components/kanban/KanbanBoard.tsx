@@ -26,7 +26,7 @@ import {
   setSceneComfyImageWorkflow,
   setSceneComfyVideoWorkflow,
 } from '@/lib/actions/scenes';
-import type { Scene, KanbanStatus, Keyframe, Character } from '@/lib/types';
+import type { Scene, KanbanStatus, Keyframe, Character, Environment } from '@/lib/types';
 import { fetchJobFromApi, JOB_POLL_INTERVAL_MS } from '@/lib/jobs/jobPolling';
 import type { ComfyWorkflowSummary } from '@/lib/actions/comfyui';
 import { useProjectStatus } from '@/components/layout/ProjectStatusContext';
@@ -38,6 +38,7 @@ interface KanbanBoardProps {
   comfyImageWorkflows?: ComfyWorkflowSummary[];
   comfyVideoWorkflows?: ComfyWorkflowSummary[];
   characters?: Character[];
+  environments?: Environment[];
 }
 
 export function KanbanBoard({
@@ -46,6 +47,7 @@ export function KanbanBoard({
   comfyImageWorkflows = [],
   comfyVideoWorkflows = [],
   characters,
+  environments,
 }: KanbanBoardProps) {
   const [scenes, setScenes] = useState<Scene[]>(initialScenes);
   const { setActiveMuse } = useProjectStatus();
@@ -561,6 +563,7 @@ export function KanbanBoard({
           }
         }}
         characters={characters}
+        environments={environments}
         onClose={() => {
           setComfyGenerateOpen(false);
           setComfyGenerateScene(null);
