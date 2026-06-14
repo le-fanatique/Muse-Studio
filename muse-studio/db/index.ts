@@ -258,6 +258,41 @@ function applySchema(database: Database.Database): void {
       character_id TEXT NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
       PRIMARY KEY (scene_id, character_id)
     );
+
+    -- Environment sheets: per-project environments and their reference images
+    CREATE TABLE IF NOT EXISTS environments (
+      id               TEXT PRIMARY KEY,
+      project_id       TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      name             TEXT NOT NULL,
+      description      TEXT,
+      design_notes     TEXT,
+      environment_type TEXT,
+      sort_order       INTEGER NOT NULL DEFAULT 0,
+      prompt_positive  TEXT,
+      prompt_negative  TEXT,
+      tags             TEXT,
+      created_at       TEXT NOT NULL,
+      updated_at       TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS environment_images (
+      id             TEXT PRIMARY KEY,
+      environment_id TEXT NOT NULL REFERENCES environments(id) ON DELETE CASCADE,
+      kind           TEXT NOT NULL DEFAULT 'ESTABLISHING',
+      image_path     TEXT NOT NULL,
+      source         TEXT NOT NULL DEFAULT 'UPLOAD',
+      width          INTEGER NOT NULL DEFAULT 0,
+      height         INTEGER NOT NULL DEFAULT 0,
+      notes          TEXT,
+      created_at     TEXT NOT NULL,
+      updated_at     TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS scene_environments (
+      scene_id       TEXT NOT NULL REFERENCES scenes(id) ON DELETE CASCADE,
+      environment_id TEXT NOT NULL REFERENCES environments(id) ON DELETE CASCADE,
+      PRIMARY KEY (scene_id, environment_id)
+    );
   `);
 
   // Backfill comfy workflow columns on existing scenes tables

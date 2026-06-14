@@ -70,6 +70,45 @@ export interface Character {
   updatedAt: Date;
 }
 
+// ── Environment sheets ─────────────────────────────────────────────────────────
+
+export type EnvironmentImageKind =
+  | 'ESTABLISHING'
+  | 'DETAIL'
+  | 'MOOD'
+  | 'LIGHTING'
+  | 'REFERENCE'
+  | 'OTHER';
+
+export type EnvironmentImageSource = 'UPLOAD' | 'KEYFRAME' | 'EXTERNAL';
+
+export interface EnvironmentImage {
+  id: string;
+  environmentId: string;
+  kind: EnvironmentImageKind;
+  image: ImageAsset;
+  source: EnvironmentImageSource;
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Environment {
+  id: string;
+  projectId: string;
+  name: string;
+  description?: string;
+  designNotes?: string;
+  environmentType?: string;
+  sortOrder: number;
+  promptPositive?: string;
+  promptNegative?: string;
+  tags: string[];
+  images: EnvironmentImage[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface GenerationParams {
   prompt?: string;
   denoiseStrength?: number;
