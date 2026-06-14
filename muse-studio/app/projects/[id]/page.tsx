@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { deriveProjectStage } from '@/lib/derive-project-stage';
 import { listCharacters } from '@/lib/actions/characters';
 import { ProjectCharactersButton } from '@/components/characters/ProjectCharactersButton';
+import { ProjectEnvironmentsButton } from '@/components/environments/ProjectEnvironmentsButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -133,6 +134,11 @@ export default async function ProjectKanbanPage({ params, searchParams }: PagePr
         })}
 
         <ProjectCharactersButton
+          projectId={id}
+          projectTitle={project.title}
+        />
+
+        <ProjectEnvironmentsButton
           projectId={id}
           projectTitle={project.title}
         />
