@@ -259,7 +259,7 @@ interface AddCharacterImageInput {
   source?: CharacterImageSource;
   width?: number;
   height?: number;
-  notes?: string;
+  notes?: string | null;
 }
 
 export async function addCharacterImage(input: AddCharacterImageInput): Promise<CharacterImage> {
@@ -294,4 +294,21 @@ export async function addCharacterImage(input: AddCharacterImageInput): Promise<
 export async function deleteCharacterImage(id: string): Promise<void> {
   db.prepare('DELETE FROM character_images WHERE id = ?').run(id);
 }
+export async function uploadImageToCharacter(input: {
+  characterId: string;
+  imagePath: string;
+  kind?: CharacterImageKind;
+  notes?: string | null;
+}): Promise<CharacterImage> {
+  return addCharacterImage({
+    characterId: input.characterId,
+    imagePath: input.imagePath,
+    kind: input.kind ?? 'FACE',
+    source: 'UPLOAD',
+    notes: input.notes ?? null,
+  });
+}
 
+export async function removeCharacterImage(imageId: string): Promise<void> {
+  await deleteCharacterImage(imageId);
+}

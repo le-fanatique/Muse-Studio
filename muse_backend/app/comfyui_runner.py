@@ -16,6 +16,7 @@ import asyncio
 import json
 import mimetypes
 import time
+import os
 import urllib.parse as _urlparse
 
 import httpx
@@ -79,9 +80,23 @@ class ComfyUIRunner:
             await self._prepare_media_inputs(client, workflow)
 
             # 1) Submit prompt
+            comfy_api_key = os.getenv("COMFYUI_API_KEY")
+
+            payload = {
+                "client_id": client_id,
+                "prompt": workflow,
+            }
+
+            if comfy_api_key:
+                payload["extra_data"] = {
+                    "api_key_comfy_org": comfy_api_key
+                }
+
+            print("COMFYUI_API_KEY FOUND:", bool(comfy_api_key))
+
             submit_resp = await client.post(
                 f"{self.base_url}/prompt",
-                json={"client_id": client_id, "prompt": workflow},
+                json=payload,
             )
             submit_resp.raise_for_status()
             payload = submit_resp.json()

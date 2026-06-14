@@ -5,11 +5,22 @@ import { randomUUID } from 'crypto';
 
 const OUTPUTS_ROOT = path.join(process.cwd(), 'outputs');
 const REFS_DIR = 'refs';
+
 // Allow both image and audio references; filenames are later passed to ComfyUI
 const ALLOWED_EXT = [
-  '.png', '.jpg', '.jpeg', '.webp', '.gif',
-  '.mp3', '.wav', '.m4a', '.flac', '.ogg', '.aac',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.webp',
+  '.gif',
+  '.mp3',
+  '.wav',
+  '.m4a',
+  '.flac',
+  '.ogg',
+  '.aac',
 ];
+
 const MAX_FILES = 4;
 // 5 MB per image
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
@@ -19,11 +30,30 @@ function getExt(name: string): string {
   return ALLOWED_EXT.includes(ext) ? ext : '.png';
 }
 
+function isValidUploadFile(value: FormDataEntryValue): value is File {
+  return (
+    value &&
+    typeof value === 'object' &&
+    'size' in value &&
+    'type' in value &&
+    'name' in value &&
+    typeof value.size === 'number' &&
+    value.size > 0
+  );
+}
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const sceneId = formData.get('sceneId');
-    const files = formData.getAll('files') as File[];
+
+    // Robust compatibility:
+    // - Existing Muse route expects "files"
+    // - Some manual upload components may send a single "file"
+    const files = [
+      ...formData.getAll('files'),
+      ...formData.getAll('file'),
+    ].filter(isValidUploadFile);
 
     if (!sceneId || typeof sceneId !== 'string') {
       return NextResponse.json({ error: 'Missing sceneId' }, { status: 400 });
@@ -32,16 +62,24 @@ export async function POST(req: NextRequest) {
     // Basic validation — accept images and audio
     const validFiles = files.filter(
       (f) =>
-        f &&
-        typeof f === 'object' &&
-        f.size > 0 &&
-        (f.type.startsWith('image/') ||
-          f.type.startsWith('audio/') ||
-          ALLOWED_EXT.includes(getExt(f.name))),
+        f.type.startsWith('image/') ||
+        f.type.startsWith('audio/') ||
+        ALLOWED_EXT.includes(getExt(f.name)),
     );
+
     if (validFiles.length === 0) {
-      return NextResponse.json({ error: 'No valid image files' }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: 'No valid image files',
+          debug: {
+            receivedFilesCount: files.length,
+            fields: Array.from(formData.keys()),
+          },
+        },
+        { status: 400 },
+      );
     }
+
     // Enforce 5 MB per image
     const tooLarge = validFiles.find((f) => f.size > MAX_FILE_BYTES);
     if (tooLarge) {
@@ -50,8 +88,12 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
+
     if (validFiles.length > MAX_FILES) {
-      return NextResponse.json({ error: `Maximum ${MAX_FILES} reference images allowed` }, { status: 400 });
+      return NextResponse.json(
+        { error: `Maximum ${MAX_FILES} reference images allowed` },
+        { status: 400 },
+      );
     }
 
     const sceneDir = path.join(OUTPUTS_ROOT, REFS_DIR, sceneId);
@@ -69,7 +111,7 @@ export async function POST(req: NextRequest) {
       paths.push(`${REFS_DIR}/${sceneId}/${baseName}`);
     }
 
-    return NextResponse.json({ paths });
+    return NextResponse.json({ paths, path: paths[0] });
   } catch (err) {
     console.error('Reference upload error:', err);
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 });

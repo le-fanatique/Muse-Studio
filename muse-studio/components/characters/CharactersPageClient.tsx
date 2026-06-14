@@ -7,15 +7,20 @@ import {
   Loader2,
   FileImage,
 } from 'lucide-react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { ManualImageUploadButton } from '@/components/media/ManualImageUploadButton';
 import type { Character, StorylineContent } from '@/lib/types';
 import type { LLMSettings } from '@/lib/actions/settings';
 import type { ComfyWorkflowSummary } from '@/lib/actions/comfyui';
 import { cn } from '@/lib/utils';
 import { useStoryMuse } from '@/hooks/useStoryMuse';
-import { createCharacter, updateCharacter } from '@/lib/actions/characters';
+import {
+  createCharacter,
+  updateCharacter,
+  addCharacterImage,
+  deleteCharacterImage,
+} from '@/lib/actions/characters';
 import { CharacterComfyGenerateDialog } from '@/components/characters/CharacterComfyGenerateDialog';
 
 const NO_ROLE_LABEL = 'No role';
@@ -27,12 +32,13 @@ function groupCharactersByRole(characters: Character[]): Record<string, Characte
     if (!map[role]) map[role] = [];
     map[role].push(c);
   }
-  // Sort roles: "No role" last; else alphabetical
+
   const sortedKeys = Object.keys(map).sort((a, b) => {
     if (a === NO_ROLE_LABEL) return 1;
     if (b === NO_ROLE_LABEL) return -1;
     return a.localeCompare(b);
   });
+
   const result: Record<string, Character[]> = {};
   for (const k of sortedKeys) result[k] = map[k];
   return result;
@@ -63,6 +69,7 @@ export function CharactersPageClient({
     );
     return sorted[0]?.id ?? null;
   });
+
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -79,6 +86,7 @@ export function CharactersPageClient({
   const selectedCharacter = selectedId
     ? (characters.find((c) => c.id === selectedId) ?? null)
     : null;
+
   const grouped = groupCharactersByRole(characters);
 
   function resetForm() {
@@ -172,7 +180,6 @@ export function CharactersPageClient({
 
   return (
     <div className="flex flex-1 min-h-0">
-      {/* Side panel: Role + character list */}
       <aside className="w-64 shrink-0 flex flex-col border-r border-white/8 bg-[oklch(0.12_0.01_264)]">
         <div className="p-3 border-b border-white/8">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
@@ -182,6 +189,7 @@ export function CharactersPageClient({
             {projectTitle}
           </p>
         </div>
+
         <div className="flex-1 overflow-y-auto p-2">
           {characters.length === 0 ? (
             <p className="text-xs text-muted-foreground/70 p-2">
@@ -193,6 +201,7 @@ export function CharactersPageClient({
                 <p className="text-[10px] font-medium uppercase tracking-wider text-violet-400/90 px-2 mb-1.5">
                   {role}
                 </p>
+
                 <ul className="space-y-0.5">
                   {list.map((char) => (
                     <li key={char.id}>
@@ -222,11 +231,9 @@ export function CharactersPageClient({
         </div>
       </aside>
 
-      {/* Main area: New character form or selected character detail */}
       <main className="flex-1 min-w-0 overflow-y-auto flex flex-col">
         <div className="p-5 max-w-3xl">
           {!selectedCharacter ? (
-            /* New Character form */
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/20">
@@ -322,7 +329,6 @@ export function CharactersPageClient({
               </form>
             </div>
           ) : (
-            /* Selected character detail */
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
@@ -338,6 +344,7 @@ export function CharactersPageClient({
                     )}
                   </div>
                 </div>
+
                 <Button
                   type="button"
                   variant="outline"
@@ -370,6 +377,7 @@ export function CharactersPageClient({
                   <p className="text-[11px] font-medium text-muted-foreground/80">
                     Visual prompt (for Flux 2 Klein / Qwen Edit)
                   </p>
+
                   <Button
                     type="button"
                     variant="outline"
@@ -398,9 +406,9 @@ export function CharactersPageClient({
                   onBlur={() => {
                     const current = characters.find((c) => c.id === selectedCharacter.id);
                     if (current?.promptPositive !== undefined) {
-                      updateCharacter(selectedCharacter.id, { promptPositive: current.promptPositive }).catch(
-                        () => setError('Failed to save prompt.'),
-                      );
+                      updateCharacter(selectedCharacter.id, {
+                        promptPositive: current.promptPositive,
+                      }).catch(() => setError('Failed to save prompt.'));
                     }
                   }}
                   rows={4}
@@ -409,41 +417,100 @@ export function CharactersPageClient({
                 />
               </div>
 
-              {selectedCharacter.images && selectedCharacter.images.length > 0 && (
-                <div className="space-y-1.5">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
                   <p className="text-[11px] font-medium text-muted-foreground/75">
                     Reference images
                   </p>
-                  <div className="flex flex-wrap gap-1.5">
+
+                  <ManualImageUploadButton
+                    sceneId={`character-${selectedCharacter.id}`}
+                    label="Upload image"
+                    onUploaded={async (rawPath) => {
+                      const imagePath = rawPath.startsWith('/api/outputs/')
+                        ? rawPath.replace('/api/outputs/', '')
+                        : rawPath;
+
+                      const image = await addCharacterImage({
+                        characterId: selectedCharacter.id,
+                        imagePath,
+                        kind: 'FACE',
+                        source: 'UPLOAD',
+                        notes: null,
+                      });
+
+                      setCharacters((prev) =>
+                        prev.map((c) =>
+                          c.id === selectedCharacter.id
+                            ? { ...c, images: [...(c.images ?? []), image] }
+                            : c,
+                        ),
+                      );
+                    }}
+                  />
+                </div>
+
+                {selectedCharacter.images && selectedCharacter.images.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
                     {selectedCharacter.images.map((img) => (
-                      <button
+                      <div
                         key={img.id}
-                        type="button"
-                        className="h-12 w-12 overflow-hidden rounded-md border border-white/10 bg-black/40 hover:border-violet-400/70 transition-colors"
-                        onClick={() => {
-                          if (img.image?.url) {
-                            window.open(img.image.url, '_blank', 'noreferrer');
-                          }
-                        }}
+                        className="group relative h-16 w-16 overflow-hidden rounded-md border border-white/10 bg-black/40"
                         title={img.kind.toLowerCase()}
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={img.image?.url}
-                          alt={img.kind}
-                          className="h-full w-full object-cover"
-                        />
-                      </button>
+                        <button
+                          type="button"
+                          className="h-full w-full"
+                          onClick={() => {
+                            if (img.image?.url) {
+                              window.open(img.image.url, '_blank', 'noreferrer');
+                            }
+                          }}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={img.image?.url}
+                            alt={img.kind}
+                            className="h-full w-full object-cover"
+                          />
+                        </button>
+
+                        <button
+                          type="button"
+                          className="absolute right-1 top-1 rounded bg-red-500/80 px-1.5 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100"
+                          onClick={async () => {
+                            await deleteCharacterImage(img.id);
+
+                            setCharacters((prev) =>
+                              prev.map((c) =>
+                                c.id === selectedCharacter.id
+                                  ? {
+                                      ...c,
+                                      images: (c.images ?? []).filter((i) => i.id !== img.id),
+                                    }
+                                  : c,
+                              ),
+                            );
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
                     ))}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <p className="text-xs text-muted-foreground/50">
+                    No reference image yet.
+                  </p>
+                )}
+              </div>
 
               {comfyImageWorkflows.length > 0 && (
                 <div className="flex items-center justify-between gap-2 pt-2">
                   <p className="text-[11px] text-muted-foreground/70">
                     Generate character sheet image with ComfyUI.
                   </p>
+
                   <Button
                     type="button"
                     size="xs"
