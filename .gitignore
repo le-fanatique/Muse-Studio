@@ -169,3 +169,4 @@ cache/
 .DS_Store
 Thumbs.db
 desktop.ini
+run-muse-local-dev.bat
