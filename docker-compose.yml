@@ -12,7 +12,6 @@ services:
       MUSE_VIDEO_HTTP_BASE: "http://frontend:3000"
       MUSE_FRONTEND_BASE_URL: "http://localhost:3000"
       COMFYUI_BASE_URL: "http://host.docker.internal:8000"
-      COMFYUI_API_KEY: comfyui-38499822a41adb1c2f0684371d883682d0e36fa4693c79457604b88bb0b9a2fa
     volumes:
       - ./muse_backend:/app/muse_backend
       - ./muse-studio/outputs:/app/muse-studio/outputs
