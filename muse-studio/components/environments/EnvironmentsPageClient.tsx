@@ -17,6 +17,7 @@ import {
   addEnvironmentImage,
   deleteEnvironmentImage,
 } from '@/lib/actions/environments';
+import { EnvironmentComfyGenerateDialog } from '@/components/environments/EnvironmentComfyGenerateDialog';
 
 const NO_TYPE_LABEL = 'No type';
 
@@ -45,6 +46,7 @@ interface EnvironmentsPageClientProps {
   initialEnvironments: Environment[];
   llmSettings: LLMSettings;
   storyline?: StorylineContent;
+  comfyImageWorkflows: ComfyWorkflowSummary[];
 }
 
 export function EnvironmentsPageClient({
@@ -53,6 +55,7 @@ export function EnvironmentsPageClient({
   initialEnvironments,
   llmSettings,
   storyline,
+  comfyImageWorkflows,
 }: EnvironmentsPageClientProps) {
   const [environments, setEnvironments] = useState<Environment[]>(initialEnvironments);
   const [selectedId, setSelectedId] = useState<string | null>(() => {
@@ -73,6 +76,8 @@ export function EnvironmentsPageClient({
 
   const storyMuse = useStoryMuse();
   const [promptPendingId, setPromptPendingId] = useState<string | null>(null);
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
+  const [imageTargetId, setImageTargetId] = useState<string | null>(null);
 
   const selectedEnvironment = selectedId
     ? (environments.find((e) => e.id === selectedId) ?? null)
@@ -204,7 +209,7 @@ export function EnvironmentsPageClient({
                   <input
                     type="text"
                     value={name}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
+                    onChange={(e) => setName(e.target.value)}
                     placeholder="e.g. Neo-Tokyo Alley"
                     disabled={isPending}
                     className={cn(
@@ -221,7 +226,7 @@ export function EnvironmentsPageClient({
                   <input
                     type="text"
                     value={environmentType}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEnvironmentType(e.target.value)}
+                    onChange={(e) => setEnvironmentType(e.target.value)}
                     placeholder="e.g. INT., EXT., Urban, Sci-Fi"
                     disabled={isPending}
                     className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs placeholder:text-muted-foreground/50 focus:border-violet-500/50 focus:outline-none focus:ring-1 focus:ring-violet-500/25"
@@ -234,7 +239,7 @@ export function EnvironmentsPageClient({
                   </label>
                   <Textarea
                     value={description}
-                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDescription(e.target.value)}
+                    onChange={(e) => setDescription(e.target.value)}
                     rows={3}
                     disabled={isPending}
                     placeholder="One or two sentences describing this location."
@@ -248,7 +253,7 @@ export function EnvironmentsPageClient({
                   </label>
                   <Textarea
                     value={designNotes}
-                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDesignNotes(e.target.value)}
+                    onChange={(e) => setDesignNotes(e.target.value)}
                     rows={3}
                     disabled={isPending}
                     placeholder="Visual anchors: palette, lighting, atmosphere, props…"
@@ -360,7 +365,7 @@ export function EnvironmentsPageClient({
                   </div>
                   <Textarea
                     value={selectedEnvironment.promptPositive ?? ''}
-                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                    onChange={(e) => {
                       const next = environments.map((env: Environment) =>
                         env.id === selectedEnvironment.id
                           ? { ...env, promptPositive: e.target.value }
@@ -389,7 +394,7 @@ export function EnvironmentsPageClient({
                 </p>
                 <Textarea
                   value={selectedEnvironment.promptNegative ?? ''}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                  onChange={(e) => {
                     const next = environments.map((env: Environment) =>
                       env.id === selectedEnvironment.id
                         ? { ...env, promptNegative: e.target.value }
@@ -500,6 +505,29 @@ export function EnvironmentsPageClient({
                 )}
               </div>
 
+              {comfyImageWorkflows.length > 0 && (
+                <div className="flex items-center justify-between gap-2 pt-2">
+                  <p className="text-[11px] text-muted-foreground/70">
+                    Generate environment image with ComfyUI.
+                  </p>
+
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="outline"
+                    className="h-7 rounded-full border-violet-500/40 bg-violet-500/10 text-[11px] text-violet-100 hover:bg-violet-500/20"
+                    disabled={!selectedEnvironment.promptPositive?.trim()}
+                    onClick={() => {
+                      setImageTargetId(selectedEnvironment.id);
+                      setImageDialogOpen(true);
+                    }}
+                  >
+                    <FileImage className="mr-1 h-3 w-3" />
+                    Generate image
+                  </Button>
+                </div>
+              )}
+
               {error && (
                 <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[11px] text-red-200">
                   {error}
@@ -509,6 +537,20 @@ export function EnvironmentsPageClient({
           )}
         </div>
       </main>
+
+      <EnvironmentComfyGenerateDialog
+        open={imageDialogOpen}
+        onClose={() => setImageDialogOpen(false)}
+        environment={environments.find((e) => e.id === imageTargetId) ?? null}
+        comfyImageWorkflows={comfyImageWorkflows}
+        onImageAttached={(image) => {
+          setEnvironments((prev) =>
+            prev.map((e) =>
+              e.id === image.environmentId ? { ...e, images: [...(e.images ?? []), image] } : e,
+            ),
+          );
+        }}
+      />
     </div>
   );
 
