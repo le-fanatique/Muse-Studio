@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getComfyWorkflowJson } from '@/lib/actions/comfyui';
+import { getSetting } from '@/lib/actions/settings';
 
 export const dynamic = 'force-dynamic';
 
@@ -93,6 +94,8 @@ export async function POST(req: NextRequest) {
 
     const patchedWorkflow = patchWorkflow(baseJson, inputValues ?? {});
 
+    const comfyuiBaseUrl = await getSetting('comfyui_base_url');
+
     // Use the same backend URL setting as the shared backend client:
     // MUSE_BACKEND_URL (see muse-studio/.env.local and lib/backend-client.ts)
     const backendUrl = process.env.MUSE_BACKEND_URL ?? 'http://localhost:8000';
@@ -105,6 +108,7 @@ export async function POST(req: NextRequest) {
         workflow_name: workflowRecord.name,
         workflow: patchedWorkflow,
         ...(project_id ? { project_id } : {}),
+        ...(comfyuiBaseUrl?.trim() ? { comfyui_base_url: comfyuiBaseUrl.trim() } : {}),
       }),
     });
 

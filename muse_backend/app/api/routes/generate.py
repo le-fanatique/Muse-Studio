@@ -249,7 +249,12 @@ async def generate_comfyui(request: dict[str, Any], background_tasks: Background
         output_dir = settings.outputs_path / ("videos" if kind == "video" else "drafts")
 
     async def _run_job() -> None:
-        base_url = os.getenv("COMFYUI_BASE_URL", "http://127.0.0.1:8188")
+        _req_url = request.get("comfyui_base_url")
+        base_url = (
+            (_req_url.strip() if isinstance(_req_url, str) and _req_url.strip() else None) or
+            os.getenv("COMFYUI_BASE_URL") or
+            "http://127.0.0.1:8188"
+        )
         runner = ComfyUIRunner(base_url=base_url)
 
         async def _on_progress(percent: int, message: str) -> None:

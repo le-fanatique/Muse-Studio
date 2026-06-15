@@ -116,3 +116,9 @@ export async function saveInferenceSettings(data: InferenceSettings): Promise<vo
     video_default: data.videoDefault,
   });
 }
+
+// ─── ComfyUI settings ─────────────────────────────────────────────────────────
+
+export async function getComfyUIBaseUrl(): Promise<string> {
+  return (await getSetting('comfyui_base_url')) ?? 'http://127.0.0.1:8188';
+}
