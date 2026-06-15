@@ -448,7 +448,53 @@ async def test_comfyui_connection(request: dict[str, Any]):
             resp = await client.get(target)
         latency_ms = int((time.monotonic() - t0) * 1000)
         if 200 <= resp.status_code <= 299:
-            return JSONResponse(status_code=200, content={"ok": True, "latency_ms": latency_ms, "endpoint": _TEST_ENDPOINT})
+            diagnostics: dict[str, Any] = {}
+            try:
+                raw = resp.json()
+                if v := raw.get("comfyui_version"):
+                    diagnostics["version"] = v
+                if sys := raw.get("system"):
+                    if o := sys.get("os"):
+                        diagnostics["os"] = o
+                if td := raw.get("torch_device"):
+                    diagnostics["torch_device"] = td
+                devices = raw.get("devices") or []
+                if devices and (gname := devices[0].get("name")):
+                    diagnostics["gpu_name"] = gname
+                vram = raw.get("vram") or {}
+                if vram:
+                    first_vram = next(iter(vram.values()), None)
+                    if first_vram:
+                        if isinstance((total := first_vram.get("total")), (int, float)) and total > 0:
+                            diagnostics["vram_total_mb"] = round(total / (1024 * 1024))
+                        if isinstance((_free := first_vram.get("free")), (int, float)) and _free > 0:
+                            diagnostics["vram_free_mb"] = round(_free / (1024 * 1024))
+                if "vram_total_mb" not in diagnostics and devices:
+                    d0 = devices[0]
+                    _vram_bytes: int | float | None = None
+                    for key in ("vram_total", "torch_vram_total", "total_memory"):
+                        v = d0.get(key)
+                        if isinstance(v, (int, float)) and v > 0:
+                            _vram_bytes = v
+                            break
+                    if _vram_bytes is not None:
+                        diagnostics["vram_total_mb"] = round(_vram_bytes / (1024 * 1024))
+                if "vram_free_mb" not in diagnostics and devices:
+                    d0 = devices[0]
+                    _vram_free_bytes: int | float | None = None
+                    for key in ("vram_free", "torch_vram_free", "free_memory"):
+                        v = d0.get(key)
+                        if isinstance(v, (int, float)) and v > 0:
+                            _vram_free_bytes = v
+                            break
+                    if _vram_free_bytes is not None:
+                        diagnostics["vram_free_mb"] = round(_vram_free_bytes / (1024 * 1024))
+            except Exception:
+                pass
+            content: dict[str, Any] = {"ok": True, "latency_ms": latency_ms, "endpoint": _TEST_ENDPOINT}
+            if diagnostics:
+                content["diagnostics"] = diagnostics
+            return JSONResponse(status_code=200, content=content)
         return JSONResponse(status_code=502, content={"ok": False, "latency_ms": latency_ms, "endpoint": _TEST_ENDPOINT})
     except httpx.ConnectError:
         return JSONResponse(status_code=502, content={"ok": False, **_base})

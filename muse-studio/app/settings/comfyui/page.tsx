@@ -62,6 +62,17 @@ export default function ComfyUISettingsPage() {
   );
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function DiagRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span className="text-muted-foreground/50 w-16 shrink-0">{label}</span>
+      <span className="text-foreground/70 font-mono truncate">{value}</span>
+    </div>
+  );
+}
+
 // ── Connection settings ───────────────────────────────────────────────────────
 
 function ConnectionSettings() {
@@ -71,7 +82,18 @@ function ConnectionSettings() {
   const [status, setStatus] = useState<'idle' | 'saved' | 'error'>('idle');
   const [isPending, startTransition] = useTransition();
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ ok: boolean; latency_ms: number } | null>(null);
+  const [testResult, setTestResult] = useState<{
+    ok: boolean;
+    latency_ms: number;
+    diagnostics?: {
+      version?: string;
+      os?: string;
+      torch_device?: string;
+      gpu_name?: string;
+      vram_total_mb?: number;
+      vram_free_mb?: number;
+    };
+  } | null>(null);
 
   useEffect(() => {
     getComfyUIBaseUrl().then((val) => {
@@ -122,7 +144,7 @@ function ConnectionSettings() {
         body: JSON.stringify({ url: trimmed }),
       });
       const data = await res.json();
-      setTestResult({ ok: data.ok ?? false, latency_ms: data.latency_ms ?? -1 });
+      setTestResult({ ok: data.ok ?? false, latency_ms: data.latency_ms ?? -1, diagnostics: data.diagnostics });
     } catch {
       setTestResult({ ok: false, latency_ms: -1 });
     } finally {
@@ -187,17 +209,46 @@ function ConnectionSettings() {
       </div>
 
       {testResult && (
-        <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${
-          testResult.ok
-            ? 'border-emerald-500/20 bg-emerald-500/8 text-emerald-400'
-            : 'border-red-500/20 bg-red-500/8 text-red-400'
-        }`}>
-          {testResult.ok
-            ? <Check className="h-3.5 w-3.5 shrink-0" />
-            : <AlertCircle className="h-3.5 w-3.5 shrink-0" />}
-          {testResult.ok
-            ? `Connected${testResult.latency_ms > 0 ? ` (${testResult.latency_ms}ms)` : ''}`
-            : 'Connection failed — check the URL and port'}
+        <div className="space-y-2">
+          <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${
+            testResult.ok
+              ? 'border-emerald-500/20 bg-emerald-500/8 text-emerald-400'
+              : 'border-red-500/20 bg-red-500/8 text-red-400'
+          }`}>
+            {testResult.ok
+              ? <Check className="h-3.5 w-3.5 shrink-0" />
+              : <AlertCircle className="h-3.5 w-3.5 shrink-0" />}
+            {testResult.ok
+              ? `Connected${testResult.latency_ms > 0 ? ` (${testResult.latency_ms}ms)` : ''}`
+              : 'Connection failed — check the URL and port'}
+          </div>
+
+          {testResult.ok && testResult.diagnostics && (
+            <div className="rounded-lg border border-white/8 bg-black/20 px-3 py-2.5 space-y-1">
+              {testResult.diagnostics.version && (
+                <DiagRow label="ComfyUI" value={testResult.diagnostics.version} />
+              )}
+              {testResult.diagnostics.os && (
+                <DiagRow label="OS" value={testResult.diagnostics.os} />
+              )}
+              {testResult.diagnostics.torch_device && (
+                <DiagRow label="Device" value={testResult.diagnostics.torch_device} />
+              )}
+              {testResult.diagnostics.gpu_name && (
+                <DiagRow label="GPU" value={testResult.diagnostics.gpu_name} />
+              )}
+              {testResult.diagnostics.vram_total_mb != null && (
+                <DiagRow
+                  label="VRAM"
+                  value={
+                    testResult.diagnostics.vram_free_mb != null
+                      ? `${testResult.diagnostics.vram_total_mb - testResult.diagnostics.vram_free_mb} / ${testResult.diagnostics.vram_total_mb} MB used`
+                      : `${testResult.diagnostics.vram_total_mb} MB`
+                  }
+                />
+              )}
+            </div>
+          )}
         </div>
       )}
     </section>
