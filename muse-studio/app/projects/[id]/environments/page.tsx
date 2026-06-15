@@ -1,8 +1,10 @@
+import React from 'react';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { getProjectById } from '@/lib/actions/projects';
 import { listEnvironments } from '@/lib/actions/environments';
+import { getLLMSettings } from '@/lib/actions/settings';
 import { EnvironmentsPageClient } from '@/components/environments/EnvironmentsPageClient';
 import { ChevronLeft } from 'lucide-react';
 
@@ -15,9 +17,10 @@ interface PageProps {
 export default async function ProjectEnvironmentsPage({ params }: PageProps) {
   const { id } = await params;
 
-  const [project, environments] = await Promise.all([
+  const [project, environments, llmSettings] = await Promise.all([
     getProjectById(id),
     listEnvironments(id),
+    getLLMSettings(),
   ]);
 
   if (!project) notFound();
@@ -56,6 +59,8 @@ export default async function ProjectEnvironmentsPage({ params }: PageProps) {
         projectId={id}
         projectTitle={project.title}
         initialEnvironments={environments}
+        llmSettings={llmSettings}
+        storyline={project.storyline}
       />
     </div>
   );

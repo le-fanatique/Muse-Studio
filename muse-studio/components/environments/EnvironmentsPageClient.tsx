@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useTransition } from 'react';
-import { MapPin, Loader2 } from 'lucide-react';
+import React, { useState, useTransition } from 'react';
+import { MapPin, Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ManualImageUploadButton } from '@/components/media/ManualImageUploadButton';
-import type { Environment } from '@/lib/types';
+import type { Environment, StorylineContent } from '@/lib/types';
+import type { LLMSettings } from '@/lib/actions/settings';
 import { cn } from '@/lib/utils';
+import { useStoryMuse } from '@/hooks/useStoryMuse';
 import {
   createEnvironment,
   updateEnvironment,
@@ -40,12 +42,16 @@ interface EnvironmentsPageClientProps {
   projectId: string;
   projectTitle: string;
   initialEnvironments: Environment[];
+  llmSettings: LLMSettings;
+  storyline?: StorylineContent;
 }
 
 export function EnvironmentsPageClient({
   projectId,
   projectTitle,
   initialEnvironments,
+  llmSettings,
+  storyline,
 }: EnvironmentsPageClientProps) {
   const [environments, setEnvironments] = useState<Environment[]>(initialEnvironments);
   const [selectedId, setSelectedId] = useState<string | null>(() => {
@@ -63,6 +69,9 @@ export function EnvironmentsPageClient({
   const [environmentType, setEnvironmentType] = useState('');
   const [description, setDescription] = useState('');
   const [designNotes, setDesignNotes] = useState('');
+
+  const storyMuse = useStoryMuse();
+  const [promptPendingId, setPromptPendingId] = useState<string | null>(null);
 
   const selectedEnvironment = selectedId
     ? (environments.find((e) => e.id === selectedId) ?? null)
@@ -93,7 +102,7 @@ export function EnvironmentsPageClient({
           designNotes: designNotes.trim() || undefined,
           sortOrder: environments.length,
         });
-        setEnvironments((prev) => [...prev, created]);
+        setEnvironments((prev: Environment[]) => [...prev, created]);
         resetForm();
         setSelectedId(created.id);
       } catch (err) {
@@ -106,7 +115,7 @@ export function EnvironmentsPageClient({
     startTransition(async () => {
       try {
         await deleteEnvironment(envId);
-        setEnvironments((prev) => prev.filter((e) => e.id !== envId));
+        setEnvironments((prev: Environment[]) => prev.filter((e: Environment) => e.id !== envId));
         if (selectedId === envId) setSelectedId(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to delete environment.');
@@ -194,7 +203,7 @@ export function EnvironmentsPageClient({
                   <input
                     type="text"
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
                     placeholder="e.g. Neo-Tokyo Alley"
                     disabled={isPending}
                     className={cn(
@@ -211,7 +220,7 @@ export function EnvironmentsPageClient({
                   <input
                     type="text"
                     value={environmentType}
-                    onChange={(e) => setEnvironmentType(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEnvironmentType(e.target.value)}
                     placeholder="e.g. INT., EXT., Urban, Sci-Fi"
                     disabled={isPending}
                     className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs placeholder:text-muted-foreground/50 focus:border-violet-500/50 focus:outline-none focus:ring-1 focus:ring-violet-500/25"
@@ -224,7 +233,7 @@ export function EnvironmentsPageClient({
                   </label>
                   <Textarea
                     value={description}
-                    onChange={(e) => setDescription(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDescription(e.target.value)}
                     rows={3}
                     disabled={isPending}
                     placeholder="One or two sentences describing this location."
@@ -238,7 +247,7 @@ export function EnvironmentsPageClient({
                   </label>
                   <Textarea
                     value={designNotes}
-                    onChange={(e) => setDesignNotes(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDesignNotes(e.target.value)}
                     rows={3}
                     disabled={isPending}
                     placeholder="Visual anchors: palette, lighting, atmosphere, props…"
@@ -327,31 +336,49 @@ export function EnvironmentsPageClient({
 
               {/* Prompt positive */}
               <div className="space-y-1.5">
-                <p className="text-[11px] font-medium text-muted-foreground/80">
-                  Visual prompt (positive)
-                </p>
-                <Textarea
-                  value={selectedEnvironment.promptPositive ?? ''}
-                  onChange={(e) => {
-                    const next = environments.map((env) =>
-                      env.id === selectedEnvironment.id
-                        ? { ...env, promptPositive: e.target.value }
-                        : env,
-                    );
-                    setEnvironments(next);
-                  }}
-                  onBlur={() => {
-                    const current = environments.find((e) => e.id === selectedEnvironment.id);
-                    if (current?.promptPositive !== undefined) {
-                      updateEnvironment(selectedEnvironment.id, {
-                        promptPositive: current.promptPositive,
-                      }).catch(() => setError('Failed to save prompt.'));
-                    }
-                  }}
-                  rows={4}
-                  placeholder="Describe the visual atmosphere of this environment for AI generation."
-                  className="resize-none bg-black/20 border-white/10 text-xs placeholder:text-muted-foreground/40"
-                />
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-medium text-muted-foreground/80">
+                      Visual prompt (positive)
+                    </p>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="xs"
+                      disabled={promptPendingId === selectedEnvironment.id || storyMuse.isGenerating}
+                      onClick={() => handleGeneratePrompt(selectedEnvironment)}
+                      className="h-7 gap-1 rounded-full border-violet-500/40 bg-violet-500/10 text-[11px] text-violet-100 hover:bg-violet-500/20"
+                    >
+                      {promptPendingId === selectedEnvironment.id || storyMuse.isGenerating ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-3 w-3" />
+                      )}
+                      Muse prompt
+                    </Button>
+                  </div>
+                  <Textarea
+                    value={selectedEnvironment.promptPositive ?? ''}
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                      const next = environments.map((env: Environment) =>
+                        env.id === selectedEnvironment.id
+                          ? { ...env, promptPositive: e.target.value }
+                          : env,
+                      );
+                      setEnvironments(next);
+                    }}
+                    onBlur={() => {
+                      const current = environments.find((e: Environment) => e.id === selectedEnvironment.id);
+                      if (current?.promptPositive !== undefined) {
+                        updateEnvironment(selectedEnvironment.id, {
+                          promptPositive: current.promptPositive,
+                        }).catch(() => setError('Failed to save prompt.'));
+                      }
+                    }}
+                    rows={4}
+                    placeholder="Describe the visual atmosphere of this environment for AI generation."
+                    className="resize-none bg-black/20 border-white/10 text-xs placeholder:text-muted-foreground/40"
+                  />
               </div>
 
               {/* Prompt negative */}
@@ -361,8 +388,8 @@ export function EnvironmentsPageClient({
                 </p>
                 <Textarea
                   value={selectedEnvironment.promptNegative ?? ''}
-                  onChange={(e) => {
-                    const next = environments.map((env) =>
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                    const next = environments.map((env: Environment) =>
                       env.id === selectedEnvironment.id
                         ? { ...env, promptNegative: e.target.value }
                         : env,
@@ -370,7 +397,7 @@ export function EnvironmentsPageClient({
                     setEnvironments(next);
                   }}
                   onBlur={() => {
-                    const current = environments.find((e) => e.id === selectedEnvironment.id);
+                    const current = environments.find((e: Environment) => e.id === selectedEnvironment.id);
                     if (current?.promptNegative !== undefined) {
                       updateEnvironment(selectedEnvironment.id, {
                         promptNegative: current.promptNegative,
@@ -406,8 +433,8 @@ export function EnvironmentsPageClient({
                         notes: null,
                       });
 
-                      setEnvironments((prev) =>
-                        prev.map((env) =>
+                      setEnvironments((prev: Environment[]) =>
+                        prev.map((env: Environment) =>
                           env.id === selectedEnvironment.id
                             ? { ...env, images: [...(env.images ?? []), image] }
                             : env,
@@ -419,7 +446,7 @@ export function EnvironmentsPageClient({
 
                 {selectedEnvironment.images && selectedEnvironment.images.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
-                    {selectedEnvironment.images.map((img) => (
+                    {selectedEnvironment.images.map((img: any) => (
                       <div
                         key={img.id}
                         className="group relative h-16 w-16 overflow-hidden rounded-md border border-white/10 bg-black/40"
@@ -448,12 +475,12 @@ export function EnvironmentsPageClient({
                           onClick={async () => {
                             await deleteEnvironmentImage(img.id);
 
-                            setEnvironments((prev) =>
-                              prev.map((env) =>
+                            setEnvironments((prev: Environment[]) =>
+                              prev.map((env: Environment) =>
                                 env.id === selectedEnvironment.id
                                   ? {
                                       ...env,
-                                      images: (env.images ?? []).filter((i) => i.id !== img.id),
+                                      images: (env.images ?? []).filter((i: any) => i.id !== img.id),
                                     }
                                   : env,
                               ),
@@ -483,4 +510,65 @@ export function EnvironmentsPageClient({
       </main>
     </div>
   );
+
+  async function handleGeneratePrompt(env: Environment) {
+    if (promptPendingId) return;
+    setPromptPendingId(env.id);
+
+    const pieces: string[] = [];
+    pieces.push(
+      'Create a single rich visual description for this film environment that can be used as an AI image prompt.',
+    );
+    pieces.push('');
+    pieces.push(`Environment name: ${env.name}`);
+    if (env.environmentType) pieces.push(`Type: ${env.environmentType}`);
+    if (env.description) pieces.push(`Description: ${env.description}`);
+    if (env.designNotes) pieces.push(`Design notes: ${env.designNotes}`);
+    if (env.tags?.length) pieces.push(`Tags: ${env.tags.join(', ')}`);
+
+    // Add specific environment-related keywords
+    pieces.push('');
+    pieces.push('Focus on: décor, lieu, ambiance, lighting, mood, establishing shot, visual design.');
+
+    const prompt = pieces.join('\n');
+
+    // NOTE: llmSettings and storyline are not available in EnvironmentsPageClientProps
+    // due to constraints. The generate call will proceed without them.
+    const { text, error: genError } = await storyMuse.generate({
+      task: 'visual_keyframe_prompt',
+      prompt,
+      projectId,
+      providerId: llmSettings.llmProvider,
+      ollamaBaseUrl: llmSettings.ollamaBaseUrl,
+      ollamaModel: llmSettings.ollamaModel,
+      openaiModel: llmSettings.openaiModel,
+      claudeModel: llmSettings.claudeModel,
+      lmstudioBaseUrl: llmSettings.lmstudioBaseUrl,
+      lmstudioModel: llmSettings.lmstudioModel,
+      openrouterModel: llmSettings.openrouterModel,
+      openrouterBaseUrl: llmSettings.openrouterBaseUrl,
+      maxTokens: 512,
+      temperature: 0.8,
+    });
+
+    if (genError) {
+      setError(genError);
+      setPromptPendingId(null);
+      return;
+    }
+
+    setEnvironments((prev: Environment[]) =>
+      prev.map((e: Environment) => (e.id === env.id ? { ...e, promptPositive: text.trim() } : e)),
+    );
+
+    startTransition(async () => {
+      try {
+        await updateEnvironment(env.id, { promptPositive: text.trim() });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to save environment prompt.');
+      } finally {
+        setPromptPendingId(null);
+      }
+    });
+  }
 }
