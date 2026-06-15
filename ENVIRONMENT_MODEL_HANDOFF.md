@@ -7,82 +7,33 @@ It allows users to define recurring locations/settings for a film project, attac
 
 ---
 
-## 2. Current clean state
+## 2. Current Status
 
 - **Branch:** `feature/environment`
-- Last known commit: `8a1ebad Fix Environment image picker visibility`
-- `origin/feature/environment` is up to date
-- Working tree expected: clean
+- **Derniers commits poussés :**
+  - Add Muse prompt for Environment
+  - Add Environment image generation
+  - Ignore local development launch script
+- **Working tree:** clean
+- **Docker build:** OK
+- **Page Environments:** charge sans crash
+- **CRUD Environment:** OK
+- **Upload/delete image:** OK
+- **Persistence after reload:** OK
+- **Environment images available in workflow image inputs:** OK
+- **Environment images hidden from non-image inputs:** OK
+- **Muse prompt Environment:** OK
+- **Generate image Environment:** OK
+- **Image générée attachée à l’Environment:** OK
+- **Image générée persistante après reload:** OK
+
+*Note: L'outil de validation automatique peut être obsolète par rapport au scope réellement validé par l'utilisateur.*
 
 ---
 
-## 3. Validated behavior
+## 3. Next Possible Tasks
 
-- CRUD Environment OK
-- Upload/delete image OK
-- Persistence after reload OK
-- Environment images available in workflow image inputs OK
-- Environment images hidden from non-image inputs OK
-
----
-
-## 4. Immediate next task
-
-- Add `Muse prompt` button/function to the Environment page.
-- **File allowed to modify:** `muse-studio/components/environments/EnvironmentsPageClient.tsx`
-- **Read-only reference file:** `muse-studio/components/characters/CharactersPageClient.tsx`
-- Do not modify any other files.
-
----
-
-## 5. Prompt for next Cline task
-
-```
-Lis ENVIRONMENT_MODEL_HANDOFF.md.
-
-Objectif :
-Ajouter le bouton/fonction "Muse prompt" dans la page Environment, en miroir de Character.
-
-Contexte :
-La feature Environment est déjà fonctionnelle :
-- CRUD Environment
-- upload/delete image
-- persistence after reload
-- Environment images in workflow picker
-- Environment images visible only in image inputs
-
-Fichier autorisé à modifier :
-- muse-studio/components/environments/EnvironmentsPageClient.tsx
-
-Fichier de référence en lecture seule :
-- muse-studio/components/characters/CharactersPageClient.tsx
-
-Contraintes :
-- Ne modifie aucun autre fichier.
-- Ne crée aucun fichier.
-- Ne touche pas aux composants Character.
-- Ne touche pas aux workflows.
-- Ne touche pas à DB/types/actions.
-- Ne lance aucune commande terminal.
-- Ne fais pas de commit.
-- Fais le plus petit changement possible.
-- Copie le mécanisme "Muse prompt" existant côté Character.
-- Adapte le texte pour un Environment : décor, lieu, ambiance, lighting, mood, establishing shot.
-
-Après modification :
-- Résume exactement le changement.
-- Liste les fichiers modifiés.
-- Ne lance pas de test.
-```
-
----
-
-## 6. Do not do in next task
-
-- Do not add `Generate image` now
-- Do not create `EnvironmentComfyGenerateDialog` now
-- Do not touch `ComfyGenerateDialog`
-- Do not touch `KanbanBoard`
-- Do not touch `app/projects/[id]/page.tsx`
-- Do not re-architect Environment
-- Do not scan the entire repo
+1. Polish UI Environment
+2. Ajouter plusieurs types d’images Environment
+3. Lier Environment aux scènes/shots
+4. Améliorer les workflows Comfy dédiés Environment
