@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useState, useTransition } from 'react';
-import { MapPin, Loader2, Sparkles } from 'lucide-react';
+import { MapPin, Loader2, Sparkles, FileImage } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ManualImageUploadButton } from '@/components/media/ManualImageUploadButton';
-import type { Environment, StorylineContent } from '@/lib/types';
+import type { Environment, EnvironmentImage, StorylineContent } from '@/lib/types';
 import type { LLMSettings } from '@/lib/actions/settings';
+import type { ComfyWorkflowSummary } from '@/lib/actions/comfyui';
 import { cn } from '@/lib/utils';
 import { useStoryMuse } from '@/hooks/useStoryMuse';
 import {

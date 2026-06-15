@@ -5,6 +5,7 @@ import { AppHeader } from '@/components/layout/AppHeader';
 import { getProjectById } from '@/lib/actions/projects';
 import { listEnvironments } from '@/lib/actions/environments';
 import { getLLMSettings } from '@/lib/actions/settings';
+import { listComfyWorkflows } from '@/lib/actions/comfyui';
 import { EnvironmentsPageClient } from '@/components/environments/EnvironmentsPageClient';
 import { ChevronLeft } from 'lucide-react';
 
@@ -17,13 +18,16 @@ interface PageProps {
 export default async function ProjectEnvironmentsPage({ params }: PageProps) {
   const { id } = await params;
 
-  const [project, environments, llmSettings] = await Promise.all([
+  const [project, environments, llmSettings, allWorkflows] = await Promise.all([
     getProjectById(id),
     listEnvironments(id),
     getLLMSettings(),
+    listComfyWorkflows(),
   ]);
 
   if (!project) notFound();
+
+  const comfyImageWorkflows = allWorkflows.filter((w: { kind: string }) => w.kind === 'image');
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
@@ -61,6 +65,7 @@ export default async function ProjectEnvironmentsPage({ params }: PageProps) {
         initialEnvironments={environments}
         llmSettings={llmSettings}
         storyline={project.storyline}
+        comfyImageWorkflows={comfyImageWorkflows}
       />
     </div>
   );
