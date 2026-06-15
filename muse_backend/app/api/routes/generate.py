@@ -13,12 +13,14 @@ import os
 import re
 import time
 import uuid
+
+import httpx
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, AsyncGenerator
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.schemas import (
     VideoGenerateRequest,
@@ -420,3 +422,37 @@ async def generate_story(request: StoryGenerateRequest):
             "X-Accel-Buffering": "no",
         },
     )
+
+
+# ── ComfyUI — Connectivity test ───────────────────────────────────────────────
+
+_TEST_ENDPOINT = "/system_stats"
+
+
+@router.post("/comfyui/test")
+async def test_comfyui_connection(request: dict[str, Any]):
+    """
+    Probe a ComfyUI instance by calling GET {url}/system_stats.
+    Returns HTTP 200/400/502/504/500 so the caller can distinguish error kinds.
+    """
+    url = (request.get("url") or "").strip()
+    _base = {"latency_ms": -1, "endpoint": _TEST_ENDPOINT}
+
+    if not url or not (url.startswith("http://") or url.startswith("https://")):
+        return JSONResponse(status_code=400, content={"ok": False, **_base})
+
+    target = f"{url.rstrip('/')}{_TEST_ENDPOINT}"
+    t0 = time.monotonic()
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(target)
+        latency_ms = int((time.monotonic() - t0) * 1000)
+        if 200 <= resp.status_code <= 299:
+            return JSONResponse(status_code=200, content={"ok": True, "latency_ms": latency_ms, "endpoint": _TEST_ENDPOINT})
+        return JSONResponse(status_code=502, content={"ok": False, "latency_ms": latency_ms, "endpoint": _TEST_ENDPOINT})
+    except httpx.ConnectError:
+        return JSONResponse(status_code=502, content={"ok": False, **_base})
+    except httpx.TimeoutException:
+        return JSONResponse(status_code=504, content={"ok": False, **_base})
+    except Exception:
+        return JSONResponse(status_code=500, content={"ok": False, **_base})

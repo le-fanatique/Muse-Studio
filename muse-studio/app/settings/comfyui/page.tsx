@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useTransition } from 'react';
-import { Workflow, Plus, Trash2, Pencil, Check, X, AlertCircle } from 'lucide-react';
+import { Workflow, Plus, Trash2, Pencil, Check, X, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -70,6 +70,8 @@ function ConnectionSettings() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'saved' | 'error'>('idle');
   const [isPending, startTransition] = useTransition();
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; latency_ms: number } | null>(null);
 
   useEffect(() => {
     getComfyUIBaseUrl().then((val) => {
@@ -102,6 +104,31 @@ function ConnectionSettings() {
   }
 
   const isDirty = url.trim() !== savedUrl;
+  const isValidUrl = url.trim().startsWith('http://') || url.trim().startsWith('https://');
+
+  async function handleTest() {
+    const trimmed = url.trim();
+    if (!trimmed || !isValidUrl) {
+      setValidationError('URL must start with http:// or https://');
+      return;
+    }
+    setValidationError(null);
+    setTestResult(null);
+    setTesting(true);
+    try {
+      const res = await fetch('/api/comfyui/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: trimmed }),
+      });
+      const data = await res.json();
+      setTestResult({ ok: data.ok ?? false, latency_ms: data.latency_ms ?? -1 });
+    } catch {
+      setTestResult({ ok: false, latency_ms: -1 });
+    } finally {
+      setTesting(false);
+    }
+  }
 
   return (
     <section className="rounded-2xl border border-white/8 bg-white/3 p-5 space-y-4">
@@ -138,6 +165,15 @@ function ConnectionSettings() {
         >
           Save
         </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={testing || !url.trim() || !isValidUrl}
+          onClick={handleTest}
+        >
+          {testing && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+          Test Connection
+        </Button>
         {status === 'saved' && (
           <span className="flex items-center gap-1 text-xs text-emerald-400">
             <Check className="h-3.5 w-3.5" /> Saved
@@ -149,6 +185,21 @@ function ConnectionSettings() {
           </span>
         )}
       </div>
+
+      {testResult && (
+        <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${
+          testResult.ok
+            ? 'border-emerald-500/20 bg-emerald-500/8 text-emerald-400'
+            : 'border-red-500/20 bg-red-500/8 text-red-400'
+        }`}>
+          {testResult.ok
+            ? <Check className="h-3.5 w-3.5 shrink-0" />
+            : <AlertCircle className="h-3.5 w-3.5 shrink-0" />}
+          {testResult.ok
+            ? `Connected${testResult.latency_ms > 0 ? ` (${testResult.latency_ms}ms)` : ''}`
+            : 'Connection failed — check the URL and port'}
+        </div>
+      )}
     </section>
   );
 }
