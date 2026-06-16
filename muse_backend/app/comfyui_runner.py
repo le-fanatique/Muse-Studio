@@ -57,6 +57,11 @@ def _http_to_ws(url: str) -> str:
 @dataclass
 class ComfyUIRunner:
     base_url: str
+    api_key: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.api_key is None:
+            self.api_key = os.getenv("COMFYUI_API_KEY") or None
 
     async def run(
         self,
@@ -80,7 +85,7 @@ class ComfyUIRunner:
             await self._prepare_media_inputs(client, workflow)
 
             # 1) Submit prompt
-            comfy_api_key = os.getenv("COMFYUI_API_KEY")
+            comfy_api_key = self.api_key
 
             payload = {
                 "client_id": client_id,
@@ -91,8 +96,6 @@ class ComfyUIRunner:
                 payload["extra_data"] = {
                     "api_key_comfy_org": comfy_api_key
                 }
-
-            print("COMFYUI_API_KEY FOUND:", bool(comfy_api_key))
 
             submit_resp = await client.post(
                 f"{self.base_url}/prompt",

@@ -11,7 +11,13 @@ import {
   deleteComfyWorkflow,
   type ComfyWorkflowSummary,
 } from '@/lib/actions/comfyui';
-import { getComfyUIBaseUrl, setSetting } from '@/lib/actions/settings';
+import {
+  getComfyUIBaseUrl,
+  setSetting,
+  hasComfyUIApiKey,
+  saveComfyUIApiKey,
+  clearComfyUIApiKey,
+} from '@/lib/actions/settings';
 import { parseDynamicInputs, parseDynamicOutputs, type WorkflowNode } from '@/lib/comfy-parser';
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -36,6 +42,8 @@ export default function ComfyUISettingsPage() {
       </div>
 
       <ConnectionSettings />
+
+      <ApiKeySettings />
 
       <div>
         <h2 className="text-base font-semibold">Workflows</h2>
@@ -70,6 +78,153 @@ function DiagRow({ label, value }: { label: string; value: string }) {
       <span className="text-muted-foreground/50 w-16 shrink-0">{label}</span>
       <span className="text-foreground/70 font-mono truncate">{value}</span>
     </div>
+  );
+}
+
+// ── API Key settings ──────────────────────────────────────────────────────────
+
+function ApiKeySettings() {
+  const [hasKey, setHasKey] = useState<boolean | null>(null);
+  const [replacing, setReplacing] = useState(false);
+  const [keyInput, setKeyInput] = useState('');
+  const [isPending, startTransition] = useTransition();
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    hasComfyUIApiKey().then(setHasKey).catch(() => setHasKey(false));
+  }, []);
+
+  function handleSave() {
+    if (!keyInput.trim()) return;
+    setSaveError(null);
+    startTransition(async () => {
+      try {
+        await saveComfyUIApiKey(keyInput.trim());
+        setHasKey(true);
+        setReplacing(false);
+        setKeyInput('');
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 2000);
+      } catch (err) {
+        setSaveError(err instanceof Error ? err.message : 'Failed to save API key');
+      }
+    });
+  }
+
+  function handleClear() {
+    setSaveError(null);
+    startTransition(async () => {
+      try {
+        await clearComfyUIApiKey();
+        setHasKey(false);
+        setReplacing(false);
+        setKeyInput('');
+      } catch {
+        setSaveError('Failed to remove API key');
+      }
+    });
+  }
+
+  const showInput = hasKey === false || replacing;
+
+  return (
+    <section className="rounded-2xl border border-white/8 bg-white/3 p-5 space-y-4">
+      <div>
+        <h2 className="text-sm font-semibold">API Key</h2>
+        <p className="text-[11px] text-muted-foreground/50 mt-1">
+          Only required for{' '}
+          <code className="rounded bg-white/8 px-1 py-0.5 font-mono">comfy.org</code>{' '}
+          cloud instances. Local ComfyUI installations do not need an API key.
+        </p>
+      </div>
+
+      {hasKey === null ? (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground/50">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+        </div>
+      ) : showInput ? (
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">API Key</label>
+            <input
+              type="password"
+              value={keyInput}
+              onChange={(e) => { setKeyInput(e.target.value); setSaveError(null); }}
+              placeholder="sk-…"
+              autoComplete="new-password"
+              className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+            />
+          </div>
+          {saveError && (
+            <div className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/8 px-3 py-2 text-xs text-red-400">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+              {saveError}
+            </div>
+          )}
+          <div className="flex items-center gap-3">
+            <Button
+              size="sm"
+              disabled={isPending || !keyInput.trim()}
+              onClick={handleSave}
+              className="bg-violet-600 hover:bg-violet-500 text-white"
+            >
+              {isPending && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+              Save Key
+            </Button>
+            {replacing && (
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={isPending}
+                onClick={() => { setReplacing(false); setKeyInput(''); setSaveError(null); }}
+              >
+                Cancel
+              </Button>
+            )}
+            {saveStatus === 'saved' && (
+              <span className="flex items-center gap-1 text-xs text-emerald-400">
+                <Check className="h-3.5 w-3.5" /> Saved
+              </span>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex items-center gap-3 rounded-lg border border-white/8 bg-black/20 px-3 py-2.5">
+            <span className="text-sm tracking-widest text-muted-foreground/60 select-none">●●●●●●●●</span>
+            <span className="flex-1" />
+            <span className="text-[11px] text-emerald-400">API key configured</span>
+          </div>
+          {saveError && (
+            <div className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/8 px-3 py-2 text-xs text-red-400">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+              {saveError}
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isPending}
+              onClick={() => { setReplacing(true); setSaveError(null); }}
+            >
+              Replace
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={isPending}
+              onClick={handleClear}
+              className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+            >
+              {isPending && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+              Remove
+            </Button>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 

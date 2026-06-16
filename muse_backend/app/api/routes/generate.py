@@ -257,7 +257,13 @@ async def generate_comfyui(request: dict[str, Any], background_tasks: Background
             os.getenv("COMFYUI_BASE_URL") or
             "http://127.0.0.1:8188"
         )
-        runner = ComfyUIRunner(base_url=base_url)
+        _req_key = request.get("comfyui_api_key")
+        resolved_key = (
+            (_req_key.strip() if isinstance(_req_key, str) and _req_key.strip() else None)
+            or os.getenv("COMFYUI_API_KEY")
+            or None
+        )
+        runner = ComfyUIRunner(base_url=base_url, api_key=resolved_key)
 
         async def _on_progress(percent: int, message: str) -> None:
             _jobs[job_id]["progress_percent"] = percent

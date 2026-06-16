@@ -1,6 +1,7 @@
 'use server';
 
 import { db } from '@/db';
+import { encryptApiKey } from '@/lib/comfyui-crypto';
 
 interface SettingRow {
   key: string;
@@ -19,7 +20,9 @@ export async function getSetting(key: string): Promise<string | null> {
 
 export async function getAllSettings(): Promise<Record<string, string>> {
   const rows = db.prepare<[], SettingRow>('SELECT * FROM settings').all();
-  return Object.fromEntries(rows.map((r) => [r.key, r.value]));
+  return Object.fromEntries(
+    rows.filter((r) => r.key !== 'comfyui_api_key_enc').map((r) => [r.key, r.value]),
+  );
 }
 
 // ─── Write ─────────────────────────────────────────────────────────────────────
@@ -121,4 +124,18 @@ export async function saveInferenceSettings(data: InferenceSettings): Promise<vo
 
 export async function getComfyUIBaseUrl(): Promise<string> {
   return (await getSetting('comfyui_base_url')) ?? 'http://127.0.0.1:8188';
+}
+
+export async function hasComfyUIApiKey(): Promise<boolean> {
+  return (await getSetting('comfyui_api_key_enc')) !== null;
+}
+
+export async function saveComfyUIApiKey(value: string): Promise<void> {
+  const trimmed = value.trim();
+  if (!trimmed) throw new Error('API key cannot be empty');
+  await setSetting('comfyui_api_key_enc', encryptApiKey(trimmed));
+}
+
+export async function clearComfyUIApiKey(): Promise<void> {
+  db.prepare("DELETE FROM settings WHERE key = 'comfyui_api_key_enc'").run();
 }

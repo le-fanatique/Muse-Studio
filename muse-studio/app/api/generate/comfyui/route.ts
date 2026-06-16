@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getComfyWorkflowJson } from '@/lib/actions/comfyui';
 import { getSetting } from '@/lib/actions/settings';
+import { getDecryptedComfyUIApiKey } from '@/lib/comfyui-crypto';
 
 export const dynamic = 'force-dynamic';
 
@@ -96,6 +97,17 @@ export async function POST(req: NextRequest) {
 
     const comfyuiBaseUrl = await getSetting('comfyui_base_url');
 
+    let comfyuiApiKey: string | null = null;
+    try {
+      comfyuiApiKey = await getDecryptedComfyUIApiKey();
+    } catch (err) {
+      console.error('[/api/generate/comfyui] Failed to decrypt ComfyUI API key:', err instanceof Error ? err.message : err);
+      return NextResponse.json(
+        { error: 'Failed to decrypt ComfyUI API key. Verify COMFYUI_ENCRYPTION_KEY is set correctly.' },
+        { status: 500 },
+      );
+    }
+
     // Use the same backend URL setting as the shared backend client:
     // MUSE_BACKEND_URL (see muse-studio/.env.local and lib/backend-client.ts)
     const backendUrl = process.env.MUSE_BACKEND_URL ?? 'http://localhost:8000';
@@ -109,6 +121,7 @@ export async function POST(req: NextRequest) {
         workflow: patchedWorkflow,
         ...(project_id ? { project_id } : {}),
         ...(comfyuiBaseUrl?.trim() ? { comfyui_base_url: comfyuiBaseUrl.trim() } : {}),
+        ...(comfyuiApiKey ? { comfyui_api_key: comfyuiApiKey } : {}),
       }),
     });
 
