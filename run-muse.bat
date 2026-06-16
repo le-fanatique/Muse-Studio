@@ -12,7 +12,7 @@ echo.
 :: Default matches Next dev (port 3000). If you use another port, set MUSE_VIDEO_HTTP_BASE accordingly.
 set "MUSE_VIDEO_HTTP_BASE=http://127.0.0.1:3000"
 echo [1/2] Starting Python Backend...
-start "Muse Backend" cmd /k "cd muse_backend && .venv\Scripts\activate.bat && uvicorn app.main:app --reload --port 8000"
+start "Muse Backend" cmd /k "cd muse_backend && .venv\Scripts\activate.bat && python run.py"
 
 :: Wait a moment for backend to start
 timeout /t 2 /nobreak >nul
