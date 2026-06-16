@@ -2,6 +2,9 @@
 
 import { db } from '@/db';
 import { encryptApiKey } from '@/lib/comfyui-crypto';
+import { STORY_GENERATION_SYSTEM_PROMPTS } from '@/lib/generation/storyGenerationInternals';
+import { MUSE_PROMPT_TASKS } from '@/lib/generation/musePromptDefinitions';
+import type { MusePromptTask, MusePromptSettings } from '@/lib/generation/musePromptDefinitions';
 
 interface SettingRow {
   key: string;
@@ -157,4 +160,64 @@ export async function saveComfyUIApiKey(value: string): Promise<void> {
 
 export async function clearComfyUIApiKey(): Promise<void> {
   db.prepare("DELETE FROM settings WHERE key = 'comfyui_api_key_enc'").run();
+}
+
+// ─── Muse prompt overrides ─────────────────────────────────────────────────────
+//
+// User-editable overrides for a subset of STORY_GENERATION_SYSTEM_PROMPTS tasks
+// (storyGenerationInternals.ts). Stored as `muse_prompt_<task>` keys in `settings`;
+// absence of a key means "use the code default" (see route.ts resolution order).
+// MUSE_PROMPT_TASKS and its types live in musePromptDefinitions.ts — a "use server"
+// file can only export async functions, not runtime constants.
+
+function musePromptSettingKey(task: MusePromptTask): string {
+  return `muse_prompt_${task}`;
+}
+
+/** Returns the user override (if any) for each editable Muse prompt task, or null when unset. */
+export async function getMusePromptSettings(): Promise<MusePromptSettings> {
+  const all = await getAllSettings();
+  return Object.fromEntries(
+    MUSE_PROMPT_TASKS.map((task) => [task, all[musePromptSettingKey(task)] ?? null]),
+  ) as MusePromptSettings;
+}
+
+/** Saves overrides for the given tasks. Pass null/empty to remove an override (revert to default). */
+export async function saveMusePromptSettings(
+  overrides: Partial<Record<MusePromptTask, string>>,
+): Promise<void> {
+  const toSet: Record<string, string> = {};
+  const toDelete: MusePromptTask[] = [];
+
+  for (const task of MUSE_PROMPT_TASKS) {
+    if (!(task in overrides)) continue;
+    const value = overrides[task];
+    if (value && value.trim() && value.trim() !== STORY_GENERATION_SYSTEM_PROMPTS[task]) {
+      toSet[musePromptSettingKey(task)] = value;
+    } else {
+      toDelete.push(task);
+    }
+  }
+
+  if (Object.keys(toSet).length > 0) {
+    await setSettings(toSet);
+  }
+  for (const task of toDelete) {
+    db.prepare('DELETE FROM settings WHERE key = ?').run(musePromptSettingKey(task));
+  }
+}
+
+/** Removes the override for a single Muse prompt task, reverting it to the code default. */
+export async function resetMusePromptSetting(task: MusePromptTask): Promise<void> {
+  db.prepare('DELETE FROM settings WHERE key = ?').run(musePromptSettingKey(task));
+}
+
+/** Removes all Muse prompt overrides, reverting every task to its code default. */
+export async function resetAllMusePromptSettings(): Promise<void> {
+  const txn = db.transaction(() => {
+    for (const task of MUSE_PROMPT_TASKS) {
+      db.prepare('DELETE FROM settings WHERE key = ?').run(musePromptSettingKey(task));
+    }
+  });
+  txn();
 }

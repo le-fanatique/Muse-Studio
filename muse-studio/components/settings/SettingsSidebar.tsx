@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Brain, Info, Puzzle, Workflow } from 'lucide-react';
+import { Brain, Info, Puzzle, Sparkles, Workflow } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
   { href: '/settings/llm',     label: 'LLM',     icon: Brain,    description: 'Provider, model & API keys' },
+  { href: '/settings/muse',    label: 'Muse',    icon: Sparkles, description: 'Edit Muse system prompts' },
   { href: '/settings/comfyui', label: 'ComfyUI',  icon: Workflow, description: 'Workflow library' },
   { href: '/settings/extensions', label: 'MCP Extension', icon: Puzzle, description: 'Connect MCP servers (client)' },
   { href: '/settings/about',   label: 'About',    icon: Info,     description: 'Version & credits' },

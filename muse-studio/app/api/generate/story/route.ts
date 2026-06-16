@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getProjectById } from '@/lib/actions/projects';
-import { getLLMSettings } from '@/lib/actions/settings';
+import { getLLMSettings, getMusePromptSettings } from '@/lib/actions/settings';
+import { MUSE_PROMPT_TASKS } from '@/lib/generation/musePromptDefinitions';
 import { openRouterOptionalHeaders } from '@/lib/generation/openRouterHeaders';
 import {
   STORY_GENERATION_SYSTEM_PROMPTS,
@@ -81,8 +82,12 @@ export async function POST(req: NextRequest) {
     openrouter_base_url?: string;
   };
 
-  const systemPrompt =
-    STORY_GENERATION_SYSTEM_PROMPTS[task] ?? STORY_GENERATION_SYSTEM_PROMPTS.default;
+  let systemPrompt = STORY_GENERATION_SYSTEM_PROMPTS[task] ?? STORY_GENERATION_SYSTEM_PROMPTS.default;
+  if ((MUSE_PROMPT_TASKS as readonly string[]).includes(task)) {
+    const overrides = await getMusePromptSettings();
+    const override = overrides[task as keyof typeof overrides];
+    if (override) systemPrompt = override;
+  }
 
   let context: Record<string, unknown> = contextFromBody ? { ...contextFromBody } : {};
 
