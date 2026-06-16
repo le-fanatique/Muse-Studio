@@ -9,7 +9,8 @@ export type StoryMuseTask =
   | 'general_query'
   | 'visual_query'
   | 'motion_query'
-  | 'visual_keyframe_prompt';
+  | 'visual_keyframe_prompt'
+  | 'character_visual_prompt';
 
 export interface StoryMuseOptions {
   task: StoryMuseTask;

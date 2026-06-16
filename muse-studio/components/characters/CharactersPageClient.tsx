@@ -141,7 +141,7 @@ export function CharactersPageClient({
     const prompt = pieces.join('\n');
 
     const { text, error: genError } = await storyMuse.generate({
-      task: 'visual_keyframe_prompt',
+      task: 'character_visual_prompt',
       prompt,
       projectId,
       providerId: llmSettings.llmProvider,

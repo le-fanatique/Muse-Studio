@@ -106,7 +106,7 @@ export function CharacterSheetDialog({
     const prompt = pieces.join('\n');
 
     const { text, error } = await storyMuse.generate({
-      task: 'visual_keyframe_prompt',
+      task: 'character_visual_prompt',
       prompt,
       projectId,
       providerId: llmSettings.llmProvider,

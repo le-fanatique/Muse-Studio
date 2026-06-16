@@ -12,8 +12,7 @@ import {
 } from '@/lib/generation/storyGenerationInternals';
 import { logMusePromptDebug } from '@/lib/generation/musePromptDebugLog';
 
-// task -> human flow name for [MUSE PROMPT DEBUG] logs. 'visual_keyframe_prompt' is shared
-// by Character and Environment (see CLAUDE.md backlog B6) so it can't be disambiguated here.
+// task -> human flow name for [MUSE PROMPT DEBUG] logs.
 function flowForTask(task: string): string {
   switch (task) {
     case 'generate_storyline':
@@ -23,8 +22,10 @@ function flowForTask(task: string): string {
     case 'write_scene_script':
     case 'refine_dialogue':
       return 'Scene';
+    case 'character_visual_prompt':
+      return 'Character';
     case 'visual_keyframe_prompt':
-      return 'Character/Environment';
+      return 'Environment';
     default:
       return 'Story';
   }
@@ -120,7 +121,7 @@ export async function POST(req: NextRequest) {
         userMessage,
         maxTokens: max_tokens,
         temperature,
-        disableThinking: task === 'visual_keyframe_prompt',
+        disableThinking: task === 'visual_keyframe_prompt' || task === 'character_visual_prompt',
       });
 
     case 'openai': {
