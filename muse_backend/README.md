@@ -210,7 +210,8 @@ muse_backend/
 │       └── llm/             ← OpenAI GPT-4o
 ├── run.py                   ← Start server
 ├── requirements.txt
-├── muse_config.json         ← User configuration
+├── muse_config.json         ← Versioned default configuration
+├── muse_config.local.json   ← Gitignored runtime overrides, written by Settings → LLM (not committed)
 ├── .env.example             ← API key template
 └── .venv/                   ← NEVER commit this
 ```

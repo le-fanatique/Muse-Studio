@@ -3,31 +3,59 @@ Muse Backend Configuration Loader.
 
 Priority order (highest to lowest):
   1. Environment variables (for secrets — API keys should NEVER go in muse_config.json)
-  2. muse_config.json (for paths, server settings, provider selection)
-  3. Hardcoded defaults
+  2. muse_config.local.json (gitignored — runtime overrides written by Settings → LLM)
+  3. muse_config.json (versioned — defaults, never written to at runtime)
+  4. Hardcoded defaults
 """
 
 import json
+import logging
 import os
 from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Optional
 
+logger = logging.getLogger(__name__)
+
 # Path to muse_config.json — sits next to the muse_backend/ folder root
 _CONFIG_FILE = Path(__file__).parent.parent / "muse_config.json"
+# Gitignored local override file, written by POST /llm/config — never edit muse_config.json at runtime
+_LOCAL_CONFIG_FILE = Path(__file__).parent.parent / "muse_config.local.json"
 
 
-def _load_json_config() -> dict:
-    if _CONFIG_FILE.exists():
-        with open(_CONFIG_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            # Strip comment key if present
-            data.pop("_comment", None)
-            return data
-    return {}
+def _read_json_file(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+        data.pop("_comment", None)
+        return data
 
 
-_raw = _load_json_config()
+def _merge_config(base: dict, override: dict) -> dict:
+    """Shallow merge, one level deep — sufficient for the current flat/one-nested-level sections."""
+    merged = dict(base)
+    for key, val in override.items():
+        if isinstance(val, dict) and isinstance(merged.get(key), dict):
+            merged[key] = {**merged[key], **val}
+        else:
+            merged[key] = val
+    return merged
+
+
+def load_merged_config() -> dict:
+    """Load muse_config.json merged with muse_config.local.json (local wins). Used by config.py,
+    llm.py and llm_bridge.py so all readers stay in sync."""
+    base = _read_json_file(_CONFIG_FILE)
+    try:
+        local = _read_json_file(_LOCAL_CONFIG_FILE)
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.warning("Ignoring invalid muse_config.local.json: %s", exc)
+        local = {}
+    return _merge_config(base, local)
+
+
+_raw = load_merged_config()
 
 
 def _get(path: str, default=None):
@@ -166,9 +194,9 @@ class AppConfig:
         return self._model_formats_raw.get(model_name, ModelFormat.BF16)
 
     def reload_from_file(self):
-        """Hot-reload config from muse_config.json without restarting the server."""
+        """Hot-reload config from muse_config.json + muse_config.local.json without restarting the server."""
         global _raw
-        _raw = _load_json_config()
+        _raw = load_merged_config()
 
 
 # Singleton instance — import this everywhere

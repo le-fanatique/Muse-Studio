@@ -19,7 +19,7 @@ from pydantic import BaseModel
 router = APIRouter(prefix="/llm", tags=["LLM"])
 logger = logging.getLogger(__name__)
 
-_CONFIG_FILE = Path(__file__).resolve().parent.parent.parent.parent / "muse_config.json"
+_LOCAL_CONFIG_FILE = Path(__file__).resolve().parent.parent.parent.parent / "muse_config.local.json"
 
 
 # ── Schemas ────────────────────────────────────────────────────────────────────
@@ -71,15 +71,23 @@ class LLMConfigUpdate(BaseModel):
 
 
 def _read_config() -> dict:
-    if _CONFIG_FILE.exists():
-        with open(_CONFIG_FILE, "r", encoding="utf-8") as f:
+    """Merged view (muse_config.json + muse_config.local.json) — same resolution as app/config.py."""
+    from app.config import load_merged_config
+
+    return load_merged_config()
+
+
+def _read_local_config() -> dict:
+    if _LOCAL_CONFIG_FILE.exists():
+        with open(_LOCAL_CONFIG_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     return {}
 
 
-def _write_config(data: dict) -> None:
-    _CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(_CONFIG_FILE, "w", encoding="utf-8") as f:
+def _write_local_config(data: dict) -> None:
+    """Writes runtime overrides to muse_config.local.json — muse_config.json is never written to."""
+    _LOCAL_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(_LOCAL_CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
         f.write("\n")
 
@@ -154,13 +162,14 @@ async def get_llm_config():
 @router.post("/config", response_model=LLMConfigResponse)
 async def update_llm_config(body: LLMConfigUpdate):
     """
-    Persist the active LLM provider (and optional Ollama URL/model) to muse_config.json
-    and hot-reload. Called by Settings → LLM when the user clicks Save, so the backend
-    (Video Editor Agent, suggestion agent, etc.) uses the same provider as the UI.
+    Persist the active LLM provider (and optional Ollama URL/model) to muse_config.local.json
+    (gitignored runtime overrides — muse_config.json itself is never written to) and hot-reload.
+    Called by Settings → LLM when the user clicks Save, so the backend (Video Editor Agent,
+    suggestion agent, etc.) uses the same provider as the UI.
     """
     from app.config import settings
 
-    cfg = _read_config()
+    cfg = _read_local_config()
     if "providers" not in cfg:
         cfg["providers"] = {}
     cfg["providers"]["llm"] = body.active_provider
@@ -182,9 +191,9 @@ async def update_llm_config(body: LLMConfigUpdate):
         cfg["llm"]["openrouter_model"] = body.openrouter_model
     if body.openrouter_base_url is not None:
         cfg["llm"]["openrouter_base_url"] = body.openrouter_base_url
-    _write_config(cfg)
+    _write_local_config(cfg)
     settings.reload_from_file()
-    logger.info("[LLM] Persisted active_provider=%s to muse_config.json", body.active_provider)
+    logger.info("[LLM] Persisted active_provider=%s to muse_config.local.json", body.active_provider)
 
     cfg = _read_config()
     ollama_cfg = cfg.get("llm") or {}

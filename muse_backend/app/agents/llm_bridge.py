@@ -7,26 +7,15 @@ API keys and URLs come from app.config.settings, muse_config.json, and environme
 
 from __future__ import annotations
 
-import json
 import os
-from pathlib import Path
 from typing import Optional
 
-from app.config import settings
-
-_CONFIG_FILE = Path(__file__).resolve().parent.parent.parent / "muse_config.json"
+from app.config import load_merged_config, settings
 
 
 def _get_llm_config() -> dict:
-    """Read llm section from muse_config.json if present."""
-    if _CONFIG_FILE.exists():
-        try:
-            with open(_CONFIG_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            return data.get("llm") or {}
-        except Exception:
-            pass
-    return {}
+    """Read llm section from the merged config (muse_config.json + muse_config.local.json)."""
+    return load_merged_config().get("llm") or {}
 
 
 def _get_ollama_config() -> tuple[str, str]:

@@ -17,6 +17,9 @@ muse_backend/.env
 muse_backend/.env.*
 !muse_backend/.env.example
 
+# Local runtime overrides for muse_config.json (written by Settings → LLM, see app/config.py)
+muse_backend/muse_config.local.json
+
 muse-studio/.env.local
 muse-studio/.env*.local
 !muse-studio/.env.example
