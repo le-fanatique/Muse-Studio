@@ -16,6 +16,7 @@ from typing import Any, Callable, Optional
 from langgraph.graph import END, START, StateGraph
 
 from app.config import settings
+from app.debug_log import log_muse_prompt_debug
 from app.editor_segment_parse import parse_editor_payload
 from app.film_timeline_schema import timeline_from_smart_edit_segments
 from app.video_editor_tools import (
@@ -164,6 +165,16 @@ Segments must be within [0, {duration_sec:.1f}], start < end. If the transcript 
         from app.agents.llm_bridge import get_chat_model
 
         llm = get_chat_model(temperature=0.3, max_tokens=1024)
+        log_muse_prompt_debug(
+            flow="VideoEditor",
+            origin="video_editor_agent.py:run_editor_agent_with_meta",
+            provider=settings.providers.llm,
+            model=getattr(llm, "model", None) or getattr(llm, "model_name", None),
+            user_prompt=prompt,
+            prompt_key="editor_segment_selection",
+            temperature=0.3,
+            max_tokens=1024,
+        )
         message = llm.invoke(prompt)
         content = message.content if hasattr(message, "content") else str(message)
         if not content:

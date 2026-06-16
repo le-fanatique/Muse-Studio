@@ -120,6 +120,25 @@ export async function saveInferenceSettings(data: InferenceSettings): Promise<vo
   });
 }
 
+// ─── Debug settings ───────────────────────────────────────────────────────────
+
+export interface DebugSettings {
+  logPrompts: boolean;  // mirrors debug.log_prompts in muse_config.local.json
+}
+
+export async function getDebugSettings(): Promise<DebugSettings> {
+  const all = await getAllSettings();
+  return {
+    logPrompts: all['debug_log_prompts'] === 'true',
+  };
+}
+
+export async function saveDebugSettings(data: DebugSettings): Promise<void> {
+  await setSettings({
+    debug_log_prompts: data.logPrompts ? 'true' : 'false',
+  });
+}
+
 // ─── ComfyUI settings ─────────────────────────────────────────────────────────
 
 export async function getComfyUIBaseUrl(): Promise<string> {

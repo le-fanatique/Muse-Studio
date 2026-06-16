@@ -68,6 +68,7 @@ class LLMConfigUpdate(BaseModel):
     claude_model: Optional[str] = None
     openrouter_model: Optional[str] = None
     openrouter_base_url: Optional[str] = None
+    log_prompts: Optional[bool] = None
 
 
 def _read_config() -> dict:
@@ -191,6 +192,10 @@ async def update_llm_config(body: LLMConfigUpdate):
         cfg["llm"]["openrouter_model"] = body.openrouter_model
     if body.openrouter_base_url is not None:
         cfg["llm"]["openrouter_base_url"] = body.openrouter_base_url
+    if body.log_prompts is not None:
+        if "debug" not in cfg:
+            cfg["debug"] = {}
+        cfg["debug"]["log_prompts"] = body.log_prompts
     _write_local_config(cfg)
     settings.reload_from_file()
     logger.info("[LLM] Persisted active_provider=%s to muse_config.local.json", body.active_provider)

@@ -17,6 +17,7 @@ import {
   sseKeepAlive,
   sseNamedEvent,
 } from '@/lib/generation/scenesBatchSupport';
+import { logMusePromptDebug } from '@/lib/generation/musePromptDebugLog';
 
 /**
  * POST /api/generate/scenes
@@ -201,6 +202,30 @@ export async function POST(req: NextRequest) {
     '',
     `Generate between ${Math.max(1, targetScenes - 1)} and ${targetScenes + 2} scenes as specified.`,
   ].filter(Boolean).join('\n\n');
+
+  const sceneModelForLog =
+    provider === 'openai' ? openaiModel
+    : provider === 'claude' ? claudeModel
+    : provider === 'lmstudio' ? lmstudioModel
+    : provider === 'openrouter' ? openrouterModel
+    : ollamaModel;
+  const sceneMaxTokensForLog =
+    provider === 'claude' ? claudeMaxOutput
+    : provider === 'lmstudio' || provider === 'openai' || provider === 'openrouter' ? openaiMaxOutput
+    : ollamaNumPredict;
+
+  await logMusePromptDebug({
+    flow: 'Scene',
+    promptKey: 'scene_batch_system_prompt',
+    origin: 'app/api/generate/scenes/route.ts:POST',
+    provider,
+    model: sceneModelForLog,
+    // 0.75 mirrors the hardcoded temperature passed to generate*Text() in scenesBatchSupport.ts
+    temperature: 0.75,
+    maxTokens: sceneMaxTokensForLog,
+    systemPrompt: sceneSystemPrompt,
+    userPrompt: userMessage,
+  });
 
   // Build the streaming response
   const stream = new ReadableStream({

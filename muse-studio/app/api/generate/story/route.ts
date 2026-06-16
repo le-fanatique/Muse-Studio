@@ -10,6 +10,25 @@ import {
   streamStoryOpenAICompat,
   storySseError,
 } from '@/lib/generation/storyGenerationInternals';
+import { logMusePromptDebug } from '@/lib/generation/musePromptDebugLog';
+
+// task -> human flow name for [MUSE PROMPT DEBUG] logs. 'visual_keyframe_prompt' is shared
+// by Character and Environment (see CLAUDE.md backlog B6) so it can't be disambiguated here.
+function flowForTask(task: string): string {
+  switch (task) {
+    case 'generate_storyline':
+      return 'Story';
+    case 'rewrite_scene':
+      return 'SceneRewrite';
+    case 'write_scene_script':
+    case 'refine_dialogue':
+      return 'Scene';
+    case 'visual_keyframe_prompt':
+      return 'Character/Environment';
+    default:
+      return 'Story';
+  }
+}
 
 /**
  * POST /api/generate/story
@@ -83,6 +102,17 @@ export async function POST(req: NextRequest) {
 
   switch (provider_id) {
     case 'ollama':
+      await logMusePromptDebug({
+        flow: flowForTask(task),
+        promptKey: task,
+        origin: 'app/api/generate/story/route.ts:POST (ollama)',
+        provider: provider_id,
+        model: ollama_model,
+        temperature,
+        maxTokens: max_tokens,
+        systemPrompt,
+        userPrompt: userMessage,
+      });
       return streamStoryOllama({
         baseUrl: ollama_base_url,
         model: ollama_model,
@@ -95,6 +125,17 @@ export async function POST(req: NextRequest) {
 
     case 'openai': {
       const apiKey = process.env.OPENAI_API_KEY ?? '';
+      await logMusePromptDebug({
+        flow: flowForTask(task),
+        promptKey: task,
+        origin: 'app/api/generate/story/route.ts:POST (openai)',
+        provider: provider_id,
+        model: openai_model,
+        temperature,
+        maxTokens: max_tokens,
+        systemPrompt,
+        userPrompt: userMessage,
+      });
       return streamStoryOpenAICompat({
         baseUrl: 'https://api.openai.com/v1',
         apiKey,
@@ -109,6 +150,17 @@ export async function POST(req: NextRequest) {
 
     case 'claude': {
       const apiKey = process.env.ANTHROPIC_API_KEY ?? '';
+      await logMusePromptDebug({
+        flow: flowForTask(task),
+        promptKey: task,
+        origin: 'app/api/generate/story/route.ts:POST (claude)',
+        provider: provider_id,
+        model: claude_model,
+        temperature,
+        maxTokens: max_tokens,
+        systemPrompt,
+        userPrompt: userMessage,
+      });
       return streamStoryOpenAICompat({
         baseUrl: 'https://api.anthropic.com/v1',
         apiKey,
@@ -127,6 +179,17 @@ export async function POST(req: NextRequest) {
         process.env.NEXT_PUBLIC_LMSTUDIO_BASE_URL ??
         'http://127.0.0.1:1234';
       const model = lmstudio_model || openai_model || 'gpt-4o-mini';
+      await logMusePromptDebug({
+        flow: flowForTask(task),
+        promptKey: task,
+        origin: 'app/api/generate/story/route.ts:POST (lmstudio)',
+        provider: provider_id,
+        model,
+        temperature,
+        maxTokens: max_tokens,
+        systemPrompt,
+        userPrompt: userMessage,
+      });
       return streamStoryLMStudio({
         baseUrl,
         model,
@@ -144,6 +207,17 @@ export async function POST(req: NextRequest) {
       ).replace(/\/+$/, '');
       const model = openrouterModelBody || saved.openrouterModel || 'openai/gpt-4o-mini';
       const apiKey = process.env.OPENROUTER_API_KEY ?? '';
+      await logMusePromptDebug({
+        flow: flowForTask(task),
+        promptKey: task,
+        origin: 'app/api/generate/story/route.ts:POST (openrouter)',
+        provider: provider_id,
+        model,
+        temperature,
+        maxTokens: max_tokens,
+        systemPrompt,
+        userPrompt: userMessage,
+      });
       return streamStoryOpenAICompat({
         baseUrl,
         apiKey,

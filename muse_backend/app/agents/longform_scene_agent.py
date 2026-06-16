@@ -18,6 +18,7 @@ from langgraph.graph import END, START, StateGraph
 
 from app.agents.base import LongformSceneState
 from app.agents.llm_bridge import get_chat_model, is_provider_available
+from app.debug_log import log_muse_prompt_debug
 
 logger = logging.getLogger(__name__)
 
@@ -179,6 +180,18 @@ def generate_batch_node(state: LongformSceneState) -> dict[str, Any]:
         )
         system_prompt = _build_system_prompt(actual_batch_size)
         user_message = _build_user_message(storyline, existing + all_scenes, start_num, end_num)
+
+        log_muse_prompt_debug(
+            flow="SceneLongform",
+            origin="longform_scene_agent.py:generate_batch_node",
+            provider=state.get("provider_id") or "default",
+            model=getattr(llm, "model", None) or getattr(llm, "model_name", None) or state.get("llm_model"),
+            system_prompt=system_prompt,
+            user_prompt=user_message,
+            prompt_key="longform_scene_batch",
+            temperature=0.75,
+            max_tokens=min(32000, max(3000, 500 * actual_batch_size)),
+        )
 
         messages = [
             SystemMessage(content=system_prompt),

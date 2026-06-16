@@ -123,6 +123,20 @@ class LLMConfig:
     stream: bool = field(default_factory=lambda: _get("generation.llm.stream", True))
 
 
+@dataclass
+class DebugConfig:
+    """Empty dataclass — log_prompts is a property (not a field) for hot-reload, see below."""
+
+
+# Hot-reload: log_prompts is read from _raw on every access so POST /llm/config can take effect
+# without restart (same pattern as ProviderConfig.llm above).
+def _debug_log_prompts(_self: DebugConfig) -> bool:
+    return _get("debug.log_prompts", False)
+
+
+DebugConfig.log_prompts = property(_debug_log_prompts)  # type: ignore[assignment]
+
+
 class ModelFormat:
     BF16 = "bf16"
     FP16 = "fp16"
@@ -147,6 +161,7 @@ class AppConfig:
     video_gen: VideoGenConfig = field(default_factory=VideoGenConfig)
     llm: LLMConfig = field(default_factory=LLMConfig)
     inference: InferenceConfig = field(default_factory=InferenceConfig)
+    debug: DebugConfig = field(default_factory=DebugConfig)
 
     # Model format preferences per model name (from muse_config.json)
     _model_formats_raw: dict = field(

@@ -15,11 +15,12 @@ import {
   Sparkles,
   ExternalLink,
   Globe,
+  Terminal,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { saveLLMSettings } from '@/lib/actions/settings';
-import type { LLMSettings as LLMSettingsData } from '@/lib/actions/settings';
+import { saveLLMSettings, saveDebugSettings } from '@/lib/actions/settings';
+import type { LLMSettings as LLMSettingsData, DebugSettings } from '@/lib/actions/settings';
 
 interface LLMModel {
   name: string;
@@ -35,6 +36,7 @@ interface TestResult {
 
 interface LLMSettingsProps {
   initialSettings: LLMSettingsData;
+  initialDebugSettings: DebugSettings;
 }
 
 const PROVIDER_OPTIONS = [
@@ -144,9 +146,42 @@ function ModelPicker({ value, onChange, options }: ModelPickerProps) {
   );
 }
 
+// ── Toggle switch (mirrors McpExtensionsToolsPanel.tsx's ToggleSwitch) ───────
+
+function ToggleSwitch({
+  checked,
+  onCheckedChange,
+  'aria-label': ariaLabel,
+}: {
+  checked: boolean;
+  onCheckedChange: (v: boolean) => void;
+  'aria-label'?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={ariaLabel}
+      onClick={() => onCheckedChange(!checked)}
+      className={cn(
+        'relative inline-flex h-6 w-11 shrink-0 rounded-full border border-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500',
+        checked ? 'bg-violet-600' : 'bg-white/15',
+      )}
+    >
+      <span
+        className={cn(
+          'pointer-events-none block h-5 w-5 translate-x-0.5 rounded-full bg-white shadow transition-transform',
+          checked ? 'translate-x-5' : 'translate-x-0.5',
+        )}
+      />
+    </button>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function LLMSettings({ initialSettings }: LLMSettingsProps) {
+export function LLMSettings({ initialSettings, initialDebugSettings }: LLMSettingsProps) {
   const router = useRouter();
 
   const [provider, setProvider] = useState(initialSettings.llmProvider);
@@ -162,6 +197,7 @@ export function LLMSettings({ initialSettings }: LLMSettingsProps) {
   const [openrouterBaseUrl, setOpenrouterBaseUrl] = useState(
     initialSettings.openrouterBaseUrl ?? 'https://openrouter.ai/api/v1',
   );
+  const [logPrompts, setLogPrompts] = useState(initialDebugSettings.logPrompts);
 
   const [models, setModels] = useState<LLMModel[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
@@ -187,7 +223,8 @@ export function LLMSettings({ initialSettings }: LLMSettingsProps) {
     lmstudioUrl !== initialSettings.lmstudioBaseUrl ||
     lmstudioModel !== (initialSettings.lmstudioModel ?? 'gpt-4o-mini') ||
     openrouterModel !== (initialSettings.openrouterModel ?? 'openai/gpt-4o-mini') ||
-    openrouterBaseUrl !== (initialSettings.openrouterBaseUrl ?? 'https://openrouter.ai/api/v1');
+    openrouterBaseUrl !== (initialSettings.openrouterBaseUrl ?? 'https://openrouter.ai/api/v1') ||
+    logPrompts !== initialDebugSettings.logPrompts;
 
   // ── Load Ollama models ─────────────────────────────────────────────────────
 
@@ -286,10 +323,14 @@ export function LLMSettings({ initialSettings }: LLMSettingsProps) {
         openrouterModel,
         openrouterBaseUrl,
       });
+      await saveDebugSettings({ logPrompts });
 
       // Sync to backend so Video Editor Agent and other LLM consumers use the same provider
       try {
-        const body: Record<string, string | undefined> = { active_provider: provider };
+        const body: Record<string, string | boolean | undefined> = {
+          active_provider: provider,
+          log_prompts: logPrompts,
+        };
         if (provider === 'ollama') {
           body.ollama_base_url = ollamaUrl;
           body.ollama_model = ollamaModel;
@@ -890,6 +931,29 @@ export function LLMSettings({ initialSettings }: LLMSettingsProps) {
           </p>
         </section>
       )}
+
+      {/* ── Debug ──────────────────────────────────────────────────────────── */}
+      <section className="rounded-2xl border border-white/8 bg-[oklch(0.13_0.012_264)] p-5 space-y-4">
+        <h2 className="text-sm font-medium flex items-center gap-2">
+          <Terminal className="h-4 w-4 text-muted-foreground" />
+          Debug
+        </h2>
+
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm">Log Muse prompts in server console</p>
+            <p className="mt-1 text-xs text-muted-foreground/60">
+              Logs system prompts, user prompts, model and generation parameters for Muse
+              generation flows. Do not enable when prompts may contain sensitive content.
+            </p>
+          </div>
+          <ToggleSwitch
+            checked={logPrompts}
+            onCheckedChange={setLogPrompts}
+            aria-label="Log Muse prompts in server console"
+          />
+        </div>
+      </section>
 
       {/* Disconnect/unavailable indicator */}
       {provider === 'ollama' && !loadingModels && models.length === 0 && (
