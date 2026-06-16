@@ -441,7 +441,7 @@ async def test_comfyui_connection(request: dict[str, Any]):
     Probe a ComfyUI instance by calling GET {url}/system_stats.
     Returns HTTP 200/400/502/504/500 so the caller can distinguish error kinds.
     """
-    url = (request.get("url") or "").strip()
+    url = (request.get("url") or request.get("base_url") or "").strip()
     _base = {"latency_ms": -1, "endpoint": _TEST_ENDPOINT}
 
     if not url or not (url.startswith("http://") or url.startswith("https://")):
@@ -457,11 +457,11 @@ async def test_comfyui_connection(request: dict[str, Any]):
             diagnostics: dict[str, Any] = {}
             try:
                 raw = resp.json()
-                if v := raw.get("comfyui_version"):
+                sys = raw.get("system") or {}
+                if v := raw.get("comfyui_version") or sys.get("comfyui_version"):
                     diagnostics["version"] = v
-                if sys := raw.get("system"):
-                    if o := sys.get("os"):
-                        diagnostics["os"] = o
+                if o := sys.get("os"):
+                    diagnostics["os"] = o
                 if td := raw.get("torch_device"):
                     diagnostics["torch_device"] = td
                 devices = raw.get("devices") or []
