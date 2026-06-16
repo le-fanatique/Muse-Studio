@@ -1,9 +1,15 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { X, User, Sparkles, Loader2, FileImage, Workflow } from 'lucide-react';
+import { X, User, Sparkles, Loader2, FileImage, Workflow, Wand2, PenLine, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import type { Character, StorylineContent } from '@/lib/types';
 import type { LLMSettings } from '@/lib/actions/settings';
 import type { ComfyWorkflowSummary } from '@/lib/actions/comfyui';
@@ -11,6 +17,25 @@ import { cn } from '@/lib/utils';
 import { useStoryMuse } from '@/hooks/useStoryMuse';
 import { createCharacter, updateCharacter } from '@/lib/actions/characters';
 import { CharacterComfyGenerateDialog } from '@/components/characters/CharacterComfyGenerateDialog';
+
+function parseBriefSuggestion(text: string): {
+  primaryRole?: string;
+  shortBio?: string;
+  designNotes?: string;
+} {
+  const extract = (label: string): string | undefined => {
+    const re = new RegExp(
+      `${label}:\\s*([\\s\\S]*?)(?=PRIMARY_ROLE:|SHORT_BIO:|DESIGN_NOTES:|$)`,
+      'i',
+    );
+    return text.match(re)?.[1]?.trim() || undefined;
+  };
+  return {
+    primaryRole: extract('PRIMARY_ROLE'),
+    shortBio: extract('SHORT_BIO'),
+    designNotes: extract('DESIGN_NOTES'),
+  };
+}
 
 interface CharacterSheetDialogProps {
   open: boolean;
@@ -46,6 +71,11 @@ export function CharacterSheetDialog({
   const storyMuse = useStoryMuse();
 
   const [promptPendingId, setPromptPendingId] = useState<string | null>(null);
+  const [wbPending, setWbPending] = useState<{ id: string; action: 'suggest' | 'enhance' } | null>(null);
+  const [editingCharId, setEditingCharId] = useState<string | null>(null);
+  const [editRole, setEditRole] = useState('');
+  const [editBio, setEditBio] = useState('');
+  const [editNotes, setEditNotes] = useState('');
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [imageTargetId, setImageTargetId] = useState<string | null>(null);
 
@@ -145,6 +175,169 @@ export function CharacterSheetDialog({
     });
   }
 
+  async function handleSuggestFromStory(char: Character) {
+    if (wbPending || storyMuse.isGenerating) return;
+    setWbPending({ id: char.id, action: 'suggest' });
+
+    const pieces: string[] = [];
+    pieces.push(`TARGET CHARACTER NAME: ${char.name}`);
+    pieces.push('');
+    if (char.primaryRole || char.shortBio || char.designNotes) {
+      pieces.push('CURRENT CHARACTER FIELDS:');
+      if (char.primaryRole) pieces.push(`Existing role: ${char.primaryRole}`);
+      if (char.shortBio) pieces.push(`Existing bio: ${char.shortBio}`);
+      if (char.designNotes) pieces.push(`Existing design notes: ${char.designNotes}`);
+      pieces.push('');
+    }
+    if (storyline?.logline || storyline?.plotOutline || storyline?.genre || storyline?.themes?.length) {
+      pieces.push('PROJECT STORY CONTEXT:');
+      if (storyline?.logline) pieces.push(`Story logline: ${storyline.logline}`);
+      if (storyline?.plotOutline) pieces.push(`Plot outline: ${storyline.plotOutline}`);
+      if (storyline?.genre) pieces.push(`Genre: ${storyline.genre}`);
+      if (storyline?.themes?.length) pieces.push(`Themes: ${storyline.themes.join(', ')}`);
+      pieces.push('');
+    }
+    if (storyline?.characters?.length) {
+      pieces.push('EXISTING PROJECT CHARACTERS (for context only — do not use them as the target):');
+      storyline.characters.forEach((c) => pieces.push(`- ${c}`));
+    }
+
+    const { text, error: genError } = await storyMuse.generate({
+      task: 'character_brief_suggestion',
+      prompt: pieces.join('\n'),
+      projectId,
+      providerId: llmSettings.llmProvider,
+      ollamaBaseUrl: llmSettings.ollamaBaseUrl,
+      ollamaModel: llmSettings.ollamaModel,
+      openaiModel: llmSettings.openaiModel,
+      claudeModel: llmSettings.claudeModel,
+      lmstudioBaseUrl: llmSettings.lmstudioBaseUrl,
+      lmstudioModel: llmSettings.lmstudioModel,
+      openrouterModel: llmSettings.openrouterModel,
+      openrouterBaseUrl: llmSettings.openrouterBaseUrl,
+      maxTokens: 512,
+      temperature: 0.75,
+    });
+
+    if (genError) {
+      setError(genError);
+      setWbPending(null);
+      return;
+    }
+
+    const parsed = parseBriefSuggestion(text);
+    const updates: { primaryRole?: string; shortBio?: string; designNotes?: string } = {};
+    if (parsed.primaryRole && !char.primaryRole) updates.primaryRole = parsed.primaryRole;
+    if (parsed.shortBio && !char.shortBio) updates.shortBio = parsed.shortBio;
+    if (parsed.designNotes && !char.designNotes) updates.designNotes = parsed.designNotes;
+
+    if (Object.keys(updates).length > 0) {
+      onCharactersChange(characters.map((c) => (c.id === char.id ? { ...c, ...updates } : c)));
+      startTransition(async () => {
+        try {
+          await updateCharacter(char.id, updates);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Failed to save character.');
+        } finally {
+          setWbPending(null);
+        }
+      });
+    } else {
+      setWbPending(null);
+    }
+  }
+
+  async function handleEnhanceConstraints(char: Character) {
+    if (wbPending || storyMuse.isGenerating) return;
+    setWbPending({ id: char.id, action: 'enhance' });
+
+    const lines: string[] = [
+      'CHARACTER TO ENHANCE:',
+      `Name: ${char.name}`,
+    ];
+    if (char.primaryRole) lines.push(`Role: ${char.primaryRole}`);
+    if (char.shortBio) lines.push(`Short bio: ${char.shortBio}`);
+    if (char.designNotes) lines.push(`Existing design notes: ${char.designNotes}`);
+
+    lines.push('');
+    lines.push('TASK:');
+    lines.push('Rewrite and expand the design notes above into a richer, more specific visual direction. Preserve every concrete detail already present. Do not describe any other character.');
+
+    const toneLines: string[] = [];
+    if (storyline?.logline) toneLines.push(`Logline: ${storyline.logline}`);
+    if (storyline?.genre) toneLines.push(`Genre: ${storyline.genre}`);
+    if (storyline?.themes?.length) toneLines.push(`Themes: ${storyline.themes.join(', ')}`);
+    if (toneLines.length > 0) {
+      lines.push('');
+      lines.push('STORY CONTEXT, for tone only:');
+      lines.push(...toneLines);
+    }
+
+    const { text, error: genError } = await storyMuse.generate({
+      task: 'character_design_enhance',
+      prompt: lines.join('\n'),
+      providerId: llmSettings.llmProvider,
+      ollamaBaseUrl: llmSettings.ollamaBaseUrl,
+      ollamaModel: llmSettings.ollamaModel,
+      openaiModel: llmSettings.openaiModel,
+      claudeModel: llmSettings.claudeModel,
+      lmstudioBaseUrl: llmSettings.lmstudioBaseUrl,
+      lmstudioModel: llmSettings.lmstudioModel,
+      openrouterModel: llmSettings.openrouterModel,
+      openrouterBaseUrl: llmSettings.openrouterBaseUrl,
+      maxTokens: 512,
+      temperature: 0.7,
+    });
+
+    if (genError) {
+      setError(genError);
+      setWbPending(null);
+      return;
+    }
+
+    const enhanced = text.trim();
+    if (enhanced) {
+      onCharactersChange(
+        characters.map((c) => (c.id === char.id ? { ...c, designNotes: enhanced } : c)),
+      );
+      startTransition(async () => {
+        try {
+          await updateCharacter(char.id, { designNotes: enhanced });
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Failed to save character.');
+        } finally {
+          setWbPending(null);
+        }
+      });
+    } else {
+      setWbPending(null);
+    }
+  }
+
+  function startCardEdit(char: Character) {
+    setEditRole(char.primaryRole ?? '');
+    setEditBio(char.shortBio ?? '');
+    setEditNotes(char.designNotes ?? '');
+    setEditingCharId(char.id);
+  }
+
+  function handleSaveCard(charId: string) {
+    const updates = {
+      primaryRole: editRole.trim() || undefined,
+      shortBio: editBio.trim() || undefined,
+      designNotes: editNotes.trim() || undefined,
+    };
+    onCharactersChange(characters.map((c) => (c.id === charId ? { ...c, ...updates } : c)));
+    setEditingCharId(null);
+    startTransition(async () => {
+      try {
+        await updateCharacter(charId, updates);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to save character.');
+      }
+    });
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
@@ -195,7 +388,7 @@ export function CharacterSheetDialog({
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Kira Nakamura"
+                  placeholder="e.g. The Archivist, Mara-7"
                   disabled={isPending}
                   className={cn(
                     'w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs',
@@ -277,37 +470,157 @@ export function CharacterSheetDialog({
             ) : (
               characters.map((char) => {
                 const pendingPrompt = promptPendingId === char.id || storyMuse.isGenerating;
+                const pendingWb = wbPending?.id === char.id;
                 return (
                   <div
                     key={char.id}
                     className="rounded-xl border border-white/10 bg-white/3 px-4 py-3 flex flex-col gap-2"
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">
-                          {char.name}
-                          {char.primaryRole && (
-                            <span className="ml-1.5 text-[11px] font-normal text-muted-foreground/70">
-                              · {char.primaryRole}
-                            </span>
-                          )}
-                        </p>
-                        {char.shortBio && (
-                          <p className="mt-0.5 text-[11px] text-muted-foreground/80 line-clamp-2">
-                            {char.shortBio}
+                      {editingCharId === char.id ? (
+                        <div className="flex-1 space-y-2">
+                          <input
+                            type="text"
+                            value={editRole}
+                            onChange={(e) => setEditRole(e.target.value)}
+                            placeholder="Role (e.g. Protagonist)"
+                            className="w-full rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs placeholder:text-muted-foreground/50 focus:border-violet-500/50 focus:outline-none"
+                          />
+                          <Textarea
+                            value={editBio}
+                            onChange={(e) => setEditBio(e.target.value)}
+                            rows={2}
+                            placeholder="Short bio"
+                            className="resize-none bg-white/5 border-white/10 text-xs placeholder:text-muted-foreground/50 focus:border-violet-500/50"
+                          />
+                          <Textarea
+                            value={editNotes}
+                            onChange={(e) => setEditNotes(e.target.value)}
+                            rows={3}
+                            placeholder="Design notes"
+                            className="resize-none bg-white/5 border-white/10 text-xs placeholder:text-muted-foreground/50 focus:border-violet-500/50"
+                          />
+                          <div className="flex items-center gap-1.5">
+                            <Button
+                              type="button"
+                              size="xs"
+                              onClick={() => handleSaveCard(char.id)}
+                              className="h-6 bg-violet-600 text-[10px] hover:bg-violet-500"
+                            >
+                              Save
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="xs"
+                              onClick={() => setEditingCharId(null)}
+                              className="h-6 text-[10px]"
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-foreground">
+                            {char.name}
+                            {char.primaryRole && (
+                              <span className="ml-1.5 text-[11px] font-normal text-muted-foreground/70">
+                                · {char.primaryRole}
+                              </span>
+                            )}
                           </p>
-                        )}
-                      </div>
-
-                      {comfyImageWorkflows.length > 0 && (
-                        <div className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-1">
-                          <Workflow className="h-3 w-3 text-violet-300" />
-                          <span className="text-[10px] text-muted-foreground/70">
-                            Image workflows ready
-                          </span>
+                          {char.shortBio && (
+                            <p className="mt-0.5 text-[11px] text-muted-foreground/80 line-clamp-2">
+                              {char.shortBio}
+                            </p>
+                          )}
+                          {char.designNotes && (
+                            <p className="mt-0.5 text-[10px] text-muted-foreground/60 line-clamp-2">
+                              {char.designNotes}
+                            </p>
+                          )}
                         </div>
                       )}
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        {!editingCharId && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="xs"
+                            onClick={() => startCardEdit(char)}
+                            className="h-6 w-6 rounded-full p-0"
+                            title="Edit character details"
+                          >
+                            <Pencil className="h-2.5 w-2.5" />
+                          </Button>
+                        )}
+                        {comfyImageWorkflows.length > 0 && (
+                          <div className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-1">
+                            <Workflow className="h-3 w-3 text-violet-300" />
+                            <span className="text-[10px] text-muted-foreground/70">
+                              Image workflows ready
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
+
+                    {editingCharId !== char.id && (
+                    <TooltipProvider>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="inline-flex">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="xs"
+                                disabled={!storyline || !!wbPending || storyMuse.isGenerating || !!editingCharId}
+                                onClick={() => handleSuggestFromStory(char)}
+                                className="h-6 gap-1 rounded-full text-[10px]"
+                              >
+                                {pendingWb && wbPending?.action === 'suggest' ? (
+                                  <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                                ) : (
+                                  <Wand2 className="h-2.5 w-2.5" />
+                                )}
+                                Suggest from Story
+                              </Button>
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-56 text-center">
+                            Suggests a role, short bio, and design notes from the project storyline. Existing filled fields are preserved.
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="inline-flex">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="xs"
+                                disabled={!char.designNotes?.trim() || !!wbPending || storyMuse.isGenerating || !!editingCharId}
+                                onClick={() => handleEnhanceConstraints(char)}
+                                className="h-6 gap-1 rounded-full text-[10px]"
+                              >
+                                {pendingWb && wbPending?.action === 'enhance' ? (
+                                  <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                                ) : (
+                                  <PenLine className="h-2.5 w-2.5" />
+                                )}
+                                Enhance
+                              </Button>
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-56 text-center">
+                            Expands the current design notes into a richer visual direction. This replaces Design Notes.
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </TooltipProvider>
+                    )}
 
                     <div className="mt-1 space-y-1.5">
                       <div className="flex items-center justify-between gap-2">

@@ -34,7 +34,23 @@ interface SectionSpec {
 const SECTIONS: SectionSpec[] = [
   {
     title: 'Character',
-    fields: [{ task: 'character_visual_prompt', label: 'Character visual prompt' }],
+    fields: [
+      {
+        task: 'character_visual_prompt',
+        label: 'Character visual prompt',
+        note: 'Used by the Muse prompt button to generate the final positive image prompt for a character.',
+      },
+      {
+        task: 'character_brief_suggestion',
+        label: 'Suggest from Story prompt',
+        note: 'Used by Suggest from Story to draft primary role, short bio, and design notes from the project storyline.',
+      },
+      {
+        task: 'character_design_enhance',
+        label: 'Enhance My Constraints prompt',
+        note: 'Used by Enhance My Constraints to expand existing design notes into a richer visual direction.',
+      },
+    ],
   },
   {
     title: 'Environment',
@@ -42,27 +58,27 @@ const SECTIONS: SectionSpec[] = [
       {
         task: 'visual_keyframe_prompt',
         label: 'Environment visual prompt',
-        note: 'Also used by Scene → Generate Image Prompt.',
+        note: 'Used by Environment Muse prompt and Scene → Generate Image Prompt.',
       },
     ],
   },
   {
     title: 'Story',
     warning: 'Keep the expected section structure intact.',
-    fields: [{ task: 'generate_storyline', label: 'Generate storyline' }],
+    fields: [{ task: 'generate_storyline', label: 'Generate storyline', note: 'Used when generating the project storyline from scratch.' }],
   },
   {
     title: 'Scene',
-    fields: [{ task: 'rewrite_scene', label: 'Rewrite scene' }],
+    fields: [{ task: 'rewrite_scene', label: 'Rewrite scene', note: 'Used by Scene Muse Rewrite.' }],
   },
   {
     title: 'Ask Muse',
     fields: [
-      { task: 'write_scene_script', label: 'Write scene script' },
-      { task: 'refine_dialogue', label: 'Refine dialogue' },
-      { task: 'general_query', label: 'General query' },
-      { task: 'visual_query', label: 'Visual query' },
-      { task: 'motion_query', label: 'Motion query' },
+      { task: 'write_scene_script', label: 'Write scene script', note: 'Used by the Ask Muse chat for script writing.' },
+      { task: 'refine_dialogue', label: 'Refine dialogue', note: 'Used by the Ask Muse chat for dialogue refinement.' },
+      { task: 'general_query', label: 'General query', note: 'Used by the Ask Muse chat for general creative questions.' },
+      { task: 'visual_query', label: 'Visual query', note: 'Used by the Ask Muse chat for visual and cinematic advice.' },
+      { task: 'motion_query', label: 'Motion query', note: 'Used by the Ask Muse chat for video and motion advice.' },
     ],
   },
 ];

@@ -10,7 +10,9 @@ export type StoryMuseTask =
   | 'visual_query'
   | 'motion_query'
   | 'visual_keyframe_prompt'
-  | 'character_visual_prompt';
+  | 'character_visual_prompt'
+  | 'character_brief_suggestion'
+  | 'character_design_enhance';
 
 export interface StoryMuseOptions {
   task: StoryMuseTask;

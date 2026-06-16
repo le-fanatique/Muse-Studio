@@ -24,6 +24,8 @@ function flowForTask(task: string): string {
     case 'refine_dialogue':
       return 'Scene';
     case 'character_visual_prompt':
+    case 'character_brief_suggestion':
+    case 'character_design_enhance':
       return 'Character';
     case 'visual_keyframe_prompt':
       return 'Environment';

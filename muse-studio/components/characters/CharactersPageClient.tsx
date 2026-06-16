@@ -6,9 +6,18 @@ import {
   Sparkles,
   Loader2,
   FileImage,
+  Wand2,
+  PenLine,
+  Pencil,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { ManualImageUploadButton } from '@/components/media/ManualImageUploadButton';
 import type { Character, StorylineContent } from '@/lib/types';
 import type { LLMSettings } from '@/lib/actions/settings';
@@ -24,6 +33,25 @@ import {
 import { CharacterComfyGenerateDialog } from '@/components/characters/CharacterComfyGenerateDialog';
 
 const NO_ROLE_LABEL = 'No role';
+
+function parseBriefSuggestion(text: string): {
+  primaryRole?: string;
+  shortBio?: string;
+  designNotes?: string;
+} {
+  const extract = (label: string): string | undefined => {
+    const re = new RegExp(
+      `${label}:\\s*([\\s\\S]*?)(?=PRIMARY_ROLE:|SHORT_BIO:|DESIGN_NOTES:|$)`,
+      'i',
+    );
+    return text.match(re)?.[1]?.trim() || undefined;
+  };
+  return {
+    primaryRole: extract('PRIMARY_ROLE'),
+    shortBio: extract('SHORT_BIO'),
+    designNotes: extract('DESIGN_NOTES'),
+  };
+}
 
 function groupCharactersByRole(characters: Character[]): Record<string, Character[]> {
   const map: Record<string, Character[]> = {};
@@ -80,6 +108,11 @@ export function CharactersPageClient({
 
   const storyMuse = useStoryMuse();
   const [promptPendingId, setPromptPendingId] = useState<string | null>(null);
+  const [wbPending, setWbPending] = useState<{ id: string; action: 'suggest' | 'enhance' } | null>(null);
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [editRole, setEditRole] = useState('');
+  const [editBio, setEditBio] = useState('');
+  const [editNotes, setEditNotes] = useState('');
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [imageTargetId, setImageTargetId] = useState<string | null>(null);
 
@@ -178,6 +211,173 @@ export function CharactersPageClient({
     });
   }
 
+  async function handleSuggestFromStory(char: Character) {
+    if (wbPending || storyMuse.isGenerating) return;
+    setWbPending({ id: char.id, action: 'suggest' });
+
+    const pieces: string[] = [];
+    pieces.push(`TARGET CHARACTER NAME: ${char.name}`);
+    pieces.push('');
+    if (char.primaryRole || char.shortBio || char.designNotes) {
+      pieces.push('CURRENT CHARACTER FIELDS:');
+      if (char.primaryRole) pieces.push(`Existing role: ${char.primaryRole}`);
+      if (char.shortBio) pieces.push(`Existing bio: ${char.shortBio}`);
+      if (char.designNotes) pieces.push(`Existing design notes: ${char.designNotes}`);
+      pieces.push('');
+    }
+    if (storyline?.logline || storyline?.plotOutline || storyline?.genre || storyline?.themes?.length) {
+      pieces.push('PROJECT STORY CONTEXT:');
+      if (storyline?.logline) pieces.push(`Story logline: ${storyline.logline}`);
+      if (storyline?.plotOutline) pieces.push(`Plot outline: ${storyline.plotOutline}`);
+      if (storyline?.genre) pieces.push(`Genre: ${storyline.genre}`);
+      if (storyline?.themes?.length) pieces.push(`Themes: ${storyline.themes.join(', ')}`);
+      pieces.push('');
+    }
+    if (storyline?.characters?.length) {
+      pieces.push('EXISTING PROJECT CHARACTERS (for context only — do not use them as the target):');
+      storyline.characters.forEach((c) => pieces.push(`- ${c}`));
+    }
+
+    const { text, error: genError } = await storyMuse.generate({
+      task: 'character_brief_suggestion',
+      prompt: pieces.join('\n'),
+      projectId,
+      providerId: llmSettings.llmProvider,
+      ollamaBaseUrl: llmSettings.ollamaBaseUrl,
+      ollamaModel: llmSettings.ollamaModel,
+      openaiModel: llmSettings.openaiModel,
+      claudeModel: llmSettings.claudeModel,
+      lmstudioBaseUrl: llmSettings.lmstudioBaseUrl,
+      lmstudioModel: llmSettings.lmstudioModel,
+      openrouterModel: llmSettings.openrouterModel,
+      openrouterBaseUrl: llmSettings.openrouterBaseUrl,
+      maxTokens: 512,
+      temperature: 0.75,
+    });
+
+    if (genError) {
+      setError(genError);
+      setWbPending(null);
+      return;
+    }
+
+    const parsed = parseBriefSuggestion(text);
+    const updates: { primaryRole?: string; shortBio?: string; designNotes?: string } = {};
+    if (parsed.primaryRole && !char.primaryRole) updates.primaryRole = parsed.primaryRole;
+    if (parsed.shortBio && !char.shortBio) updates.shortBio = parsed.shortBio;
+    if (parsed.designNotes && !char.designNotes) updates.designNotes = parsed.designNotes;
+
+    if (Object.keys(updates).length > 0) {
+      setCharacters((prev) => prev.map((c) => (c.id === char.id ? { ...c, ...updates } : c)));
+      startTransition(async () => {
+        try {
+          await updateCharacter(char.id, updates);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Failed to save character.');
+        } finally {
+          setWbPending(null);
+        }
+      });
+    } else {
+      setWbPending(null);
+    }
+  }
+
+  async function handleEnhanceConstraints(char: Character) {
+    if (wbPending || storyMuse.isGenerating) return;
+    setWbPending({ id: char.id, action: 'enhance' });
+
+    const lines: string[] = [
+      'CHARACTER TO ENHANCE:',
+      `Name: ${char.name}`,
+    ];
+    if (char.primaryRole) lines.push(`Role: ${char.primaryRole}`);
+    if (char.shortBio) lines.push(`Short bio: ${char.shortBio}`);
+    if (char.designNotes) lines.push(`Existing design notes: ${char.designNotes}`);
+
+    lines.push('');
+    lines.push('TASK:');
+    lines.push('Rewrite and expand the design notes above into a richer, more specific visual direction. Preserve every concrete detail already present. Do not describe any other character.');
+
+    const toneLines: string[] = [];
+    if (storyline?.logline) toneLines.push(`Logline: ${storyline.logline}`);
+    if (storyline?.genre) toneLines.push(`Genre: ${storyline.genre}`);
+    if (storyline?.themes?.length) toneLines.push(`Themes: ${storyline.themes.join(', ')}`);
+    if (toneLines.length > 0) {
+      lines.push('');
+      lines.push('STORY CONTEXT, for tone only:');
+      lines.push(...toneLines);
+    }
+
+    const { text, error: genError } = await storyMuse.generate({
+      task: 'character_design_enhance',
+      prompt: lines.join('\n'),
+      providerId: llmSettings.llmProvider,
+      ollamaBaseUrl: llmSettings.ollamaBaseUrl,
+      ollamaModel: llmSettings.ollamaModel,
+      openaiModel: llmSettings.openaiModel,
+      claudeModel: llmSettings.claudeModel,
+      lmstudioBaseUrl: llmSettings.lmstudioBaseUrl,
+      lmstudioModel: llmSettings.lmstudioModel,
+      openrouterModel: llmSettings.openrouterModel,
+      openrouterBaseUrl: llmSettings.openrouterBaseUrl,
+      maxTokens: 512,
+      temperature: 0.7,
+    });
+
+    if (genError) {
+      setError(genError);
+      setWbPending(null);
+      return;
+    }
+
+    const enhanced = text.trim();
+    if (enhanced) {
+      setCharacters((prev) =>
+        prev.map((c) => (c.id === char.id ? { ...c, designNotes: enhanced } : c)),
+      );
+      startTransition(async () => {
+        try {
+          await updateCharacter(char.id, { designNotes: enhanced });
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Failed to save character.');
+        } finally {
+          setWbPending(null);
+        }
+      });
+    } else {
+      setWbPending(null);
+    }
+  }
+
+  function startEditDetails() {
+    if (!selectedCharacter) return;
+    setEditRole(selectedCharacter.primaryRole ?? '');
+    setEditBio(selectedCharacter.shortBio ?? '');
+    setEditNotes(selectedCharacter.designNotes ?? '');
+    setIsEditingDetails(true);
+  }
+
+  function handleSaveDetails() {
+    if (!selectedCharacter) return;
+    const updates = {
+      primaryRole: editRole.trim() || undefined,
+      shortBio: editBio.trim() || undefined,
+      designNotes: editNotes.trim() || undefined,
+    };
+    setCharacters((prev) =>
+      prev.map((c) => (c.id === selectedCharacter.id ? { ...c, ...updates } : c)),
+    );
+    setIsEditingDetails(false);
+    startTransition(async () => {
+      try {
+        await updateCharacter(selectedCharacter.id, updates);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to save character.');
+      }
+    });
+  }
+
   return (
     <div className="flex flex-1 min-h-0">
       <aside className="w-64 shrink-0 flex flex-col border-r border-white/8 bg-[oklch(0.12_0.01_264)]">
@@ -207,7 +407,7 @@ export function CharactersPageClient({
                     <li key={char.id}>
                       <button
                         type="button"
-                        onClick={() => setSelectedId(char.id)}
+                        onClick={() => { setSelectedId(char.id); setIsEditingDetails(false); }}
                         className={cn(
                           'w-full text-left rounded-lg px-2.5 py-2 text-xs transition-colors',
                           selectedId === char.id
@@ -256,7 +456,7 @@ export function CharactersPageClient({
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Kira Nakamura"
+                    placeholder="e.g. The Archivist, Mara-7"
                     disabled={isPending}
                     className={cn(
                       'w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs',
@@ -337,7 +537,7 @@ export function CharactersPageClient({
                   </div>
                   <div>
                     <h2 className="text-sm font-semibold">{selectedCharacter.name}</h2>
-                    {selectedCharacter.primaryRole && (
+                    {selectedCharacter.primaryRole && !isEditingDetails && (
                       <p className="text-xs text-muted-foreground/70">
                         {selectedCharacter.primaryRole}
                       </p>
@@ -345,31 +545,162 @@ export function CharactersPageClient({
                   </div>
                 </div>
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="text-xs"
-                  onClick={() => setSelectedId(null)}
-                >
-                  New character
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    className="h-7 gap-1 text-[11px]"
+                    onClick={startEditDetails}
+                    disabled={isEditingDetails || !!wbPending || storyMuse.isGenerating}
+                  >
+                    <Pencil className="h-3 w-3" />
+                    Edit details
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => { setSelectedId(null); setIsEditingDetails(false); }}
+                  >
+                    New character
+                  </Button>
+                </div>
               </div>
 
-              {selectedCharacter.shortBio && (
-                <div>
-                  <p className="text-[11px] font-medium text-muted-foreground mb-1">Short Bio</p>
-                  <p className="text-xs text-foreground/90">{selectedCharacter.shortBio}</p>
-                </div>
+              {!isEditingDetails && (
+                <TooltipProvider>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="xs"
+                            disabled={!storyline || !!wbPending || storyMuse.isGenerating}
+                            onClick={() => handleSuggestFromStory(selectedCharacter)}
+                            className="h-7 gap-1 rounded-full text-[11px]"
+                          >
+                            {wbPending?.id === selectedCharacter.id && wbPending.action === 'suggest' ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Wand2 className="h-3 w-3" />
+                            )}
+                            Suggest from Story
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-56 text-center">
+                        Suggests a role, short bio, and design notes from the project storyline. Existing filled fields are preserved.
+                      </TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="xs"
+                            disabled={!selectedCharacter.designNotes?.trim() || !!wbPending || storyMuse.isGenerating}
+                            onClick={() => handleEnhanceConstraints(selectedCharacter)}
+                            className="h-7 gap-1 rounded-full text-[11px]"
+                          >
+                            {wbPending?.id === selectedCharacter.id && wbPending.action === 'enhance' ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <PenLine className="h-3 w-3" />
+                            )}
+                            Enhance My Constraints
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-60 text-center">
+                        Expands the current design notes into a richer visual direction. This replaces Design Notes.
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                </TooltipProvider>
               )}
 
-              {selectedCharacter.designNotes && (
-                <div>
-                  <p className="text-[11px] font-medium text-muted-foreground mb-1">Design Notes</p>
-                  <p className="text-xs text-foreground/90 whitespace-pre-wrap">
-                    {selectedCharacter.designNotes}
-                  </p>
+              {isEditingDetails ? (
+                <div className="space-y-3 rounded-xl border border-violet-500/20 bg-violet-500/5 p-3">
+                  <div>
+                    <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                      Primary Role
+                    </label>
+                    <input
+                      type="text"
+                      value={editRole}
+                      onChange={(e) => setEditRole(e.target.value)}
+                      placeholder="e.g. Protagonist, Antagonist"
+                      className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs placeholder:text-muted-foreground/50 focus:border-violet-500/50 focus:outline-none focus:ring-1 focus:ring-violet-500/25"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                      Short Bio
+                    </label>
+                    <Textarea
+                      value={editBio}
+                      onChange={(e) => setEditBio(e.target.value)}
+                      rows={3}
+                      placeholder="One or two sentences describing who they are."
+                      className="resize-none bg-white/5 border-white/10 text-xs placeholder:text-muted-foreground/50 focus:border-violet-500/50"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                      Design Notes
+                    </label>
+                    <Textarea
+                      value={editNotes}
+                      onChange={(e) => setEditNotes(e.target.value)}
+                      rows={4}
+                      placeholder="Visual anchors: age, build, clothing, props, palette…"
+                      className="resize-none bg-white/5 border-white/10 text-xs placeholder:text-muted-foreground/50 focus:border-violet-500/50"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleSaveDetails}
+                      className="h-7 bg-violet-600 text-xs hover:bg-violet-500"
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsEditingDetails(false)}
+                      className="h-7 text-xs"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
                 </div>
+              ) : (
+                <>
+                  {selectedCharacter.shortBio && (
+                    <div>
+                      <p className="text-[11px] font-medium text-muted-foreground mb-1">Short Bio</p>
+                      <p className="text-xs text-foreground/90">{selectedCharacter.shortBio}</p>
+                    </div>
+                  )}
+
+                  {selectedCharacter.designNotes && (
+                    <div>
+                      <p className="text-[11px] font-medium text-muted-foreground mb-1">Design Notes</p>
+                      <p className="text-xs text-foreground/90 whitespace-pre-wrap">
+                        {selectedCharacter.designNotes}
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
 
               <div className="space-y-1.5">
