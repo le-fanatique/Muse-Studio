@@ -1,5 +1,7 @@
 'use server';
 
+import fs from 'fs';
+import path from 'path';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/db';
 import type { Scene, KanbanStatus, Keyframe } from '@/lib/types';
@@ -8,6 +10,7 @@ import {
   generateVideoSuggestions,
 } from '@/lib/actions/muse-agent';
 import { newPrefixedId } from '@/lib/server/ids';
+import { getOutputsRoot, normalizeStoredOutputsReference } from '@/lib/server/paths';
 
 // ─── Scene Actions ─────────────────────────────────────────────────────────────
 
@@ -238,6 +241,50 @@ export async function updateKeyframeOutput(
       .prepare<[string], { project_id: string }>('SELECT project_id FROM scenes WHERE id = ?')
       .get(row.scene_id);
     if (sceneRow) revalidatePath(`/projects/${sceneRow.project_id}`);
+  }
+}
+
+/** Delete a single keyframe and best-effort clean up its media files. Does NOT change scene status. */
+export async function deleteKeyframe(keyframeId: string): Promise<void> {
+  const kf = db
+    .prepare<[string], { scene_id: string; draft_image_path: string | null; final_image_path: string | null }>(
+      'SELECT scene_id, draft_image_path, final_image_path FROM keyframes WHERE id = ?',
+    )
+    .get(keyframeId);
+
+  if (!kf) return;
+
+  const refs = db
+    .prepare<[string], { url: string }>('SELECT url FROM reference_images WHERE keyframe_id = ?')
+    .all(keyframeId);
+
+  const sceneRow = db
+    .prepare<[string], { project_id: string }>('SELECT project_id FROM scenes WHERE id = ?')
+    .get(kf.scene_id);
+
+  // DB delete — ON DELETE CASCADE removes reference_images rows
+  db.prepare('DELETE FROM keyframes WHERE id = ?').run(keyframeId);
+
+  if (sceneRow) revalidatePath(`/projects/${sceneRow.project_id}`);
+
+  // Best-effort file cleanup — never blocking, never throws
+  const outputsRoot = getOutputsRoot();
+  const candidates: (string | null)[] = [
+    kf.draft_image_path,
+    kf.final_image_path,
+    ...refs.map((r) => r.url),
+  ];
+  for (const rel of candidates) {
+    const normalized = normalizeStoredOutputsReference(rel);
+    if (!normalized) continue;
+    const abs = path.normalize(path.join(outputsRoot, normalized));
+    if (!abs.startsWith(outputsRoot)) continue;
+    try {
+      if (fs.existsSync(abs)) fs.unlinkSync(abs);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn('[scenes] deleteKeyframe file cleanup skipped', { keyframeId, abs, message: err instanceof Error ? err.message : String(err) });
+    }
   }
 }
 

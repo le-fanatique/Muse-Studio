@@ -1,12 +1,14 @@
 'use client';
 
-import { Feather, ImagePlus, Video, Sparkles, ChevronRight } from 'lucide-react';
+import { useTransition } from 'react';
+import { Feather, ImagePlus, Trash2, Video, Sparkles, ChevronRight } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import type { Scene } from '@/lib/types';
+import { deleteKeyframe } from '@/lib/actions/scenes';
 
 interface SceneDetailSheetProps {
   scene: Scene | null;
@@ -25,6 +27,8 @@ const STATUS_LABELS: Record<Scene['status'], string> = {
 };
 
 export function SceneDetailSheet({ scene, isOpen, onClose, onAskMuse }: SceneDetailSheetProps) {
+  const [isPending, startTransition] = useTransition();
+
   if (!scene) return null;
 
   return (
@@ -133,31 +137,53 @@ export function SceneDetailSheet({ scene, isOpen, onClose, onAskMuse }: SceneDet
                 </Button>
               </div>
               <div className="grid grid-cols-3 gap-2">
-                {scene.keyframes.map((kf) => (
-                  <div
-                    key={kf.keyframeId}
-                    className="relative aspect-video rounded-lg border border-white/8 bg-gradient-to-br from-violet-900/30 to-slate-900 flex items-center justify-center overflow-hidden"
-                  >
-                    <ImagePlus className="h-4 w-4 text-muted-foreground/30" />
-                    <div className="absolute bottom-1 left-1 right-1 flex items-center justify-between">
-                      <span className="text-[8px] text-muted-foreground/60 font-mono">
-                        #{kf.sequenceOrder}
-                      </span>
-                      <span
-                        className={cn(
-                          'rounded-full px-1 py-0.5 text-[8px] font-medium',
-                          kf.status === 'APPROVED'
-                            ? 'bg-emerald-500/20 text-emerald-400'
-                            : kf.status === 'REFINING'
-                            ? 'bg-amber-500/20 text-amber-400'
-                            : 'bg-white/10 text-muted-foreground',
-                        )}
+                {scene.keyframes.map((kf) => {
+                  const imageUrl = kf.finalImage?.url ?? kf.draftImage?.url ?? null;
+                  return (
+                    <div
+                      key={kf.keyframeId}
+                      className="group/kf relative aspect-video rounded-lg border border-white/8 bg-gradient-to-br from-violet-900/30 to-slate-900 flex items-center justify-center overflow-hidden"
+                    >
+                      {imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt={`Keyframe #${kf.sequenceOrder}`}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <ImagePlus className="h-4 w-4 text-muted-foreground/30" />
+                      )}
+                      <button
+                        onClick={() => {
+                          if (!window.confirm('Delete this keyframe?')) return;
+                          startTransition(() => deleteKeyframe(kf.keyframeId));
+                        }}
+                        disabled={isPending}
+                        aria-label="Delete keyframe"
+                        className="absolute top-1 right-1 opacity-0 group-hover/kf:opacity-100 transition-opacity bg-black/60 rounded p-0.5 hover:bg-red-900/70 disabled:cursor-not-allowed"
                       >
-                        {kf.status}
-                      </span>
+                        <Trash2 className="h-3 w-3 text-red-400" />
+                      </button>
+                      <div className="absolute bottom-1 left-1 right-1 flex items-center justify-between">
+                        <span className="text-[8px] text-muted-foreground/60 font-mono">
+                          #{kf.sequenceOrder}
+                        </span>
+                        <span
+                          className={cn(
+                            'rounded-full px-1 py-0.5 text-[8px] font-medium',
+                            kf.status === 'APPROVED'
+                              ? 'bg-emerald-500/20 text-emerald-400'
+                              : kf.status === 'REFINING'
+                              ? 'bg-amber-500/20 text-amber-400'
+                              : 'bg-white/10 text-muted-foreground',
+                          )}
+                        >
+                          {kf.status}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
