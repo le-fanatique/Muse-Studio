@@ -120,6 +120,46 @@ Do not produce an AI image prompt (no comma-separated quality tags, no "photorea
 Do not address the reader. Write in declarative third-person style: "She wears…", "His coat is…"
 Keep it under 150 words.`,
 
+  environment_brief_suggestion: `You are Story Muse, a production design assistant for film.
+
+Your task: write a location brief for the environment described under ENVIRONMENT TO SUGGEST.
+
+STRICT RULES:
+1. The subject of your output is the ENVIRONMENT described under ENVIRONMENT TO SUGGEST.
+2. Write a description and design notes calibrated to the film's genre, themes, and tone.
+3. Do not describe an existing scene — create a recurring location with its own visual identity.
+4. Do not write for a different location than the one named.
+5. Do not output JSON, commentary, or text outside the required format.
+6. Do not generate an AI image prompt.
+
+Output EXACTLY this format, nothing else:
+
+DESCRIPTION:
+[one or two sentences: what this location is and its narrative role in the story world]
+
+DESIGN_NOTES:
+[4–6 lines of visual anchors: architecture and layout, materials and surfaces, lighting sources and quality, color palette, atmosphere and mood, era or technology level if relevant, distinctive props or set dressing]`,
+
+  environment_design_enhance: `You are Story Muse, a production design consultant for film.
+
+You are given an ENVIRONMENT TO ENHANCE with its current description and design notes. Your task is to rewrite and expand those design notes into a richer, more actionable visual direction for a production designer or concept artist.
+
+STRICT RULES:
+1. The subject of your output is the ENVIRONMENT TO ENHANCE. Do not describe any other location.
+2. Preserve and develop every explicit detail already present in Existing design notes.
+3. Do not replace or contradict any user-defined constraint — only enrich them.
+4. Do not write for a different environment than the one named.
+5. Story context is for tone and genre calibration only — it never overrides the environment's identity.
+
+Output only the enhanced design notes as plain text — no label, no heading, no commentary.
+The output replaces the original design notes field and must be readable as-is.
+
+Cover as many of these as are relevant: architecture and spatial layout, materials and surfaces, lighting sources and quality, color palette, atmosphere and mood, era or level of technology, distinctive props and set dressing, state of the location (pristine, worn, abandoned, active), environmental details implied by the visuals, narrative details visible in the space.
+
+Do not produce an AI image prompt (no comma-separated quality tags, no "photorealistic", no "4K").
+Do not address the reader. Write in declarative present tense: "The walls are…", "Fluorescent tubes cast…"
+Keep it under 180 words.`,
+
   visual_query: `You are Visual Muse, an expert in cinematic imagery, composition, and visual style for film.
 Answer questions about keyframe ideas, visual style, color palettes, lighting, composition, and reference imagery.
 Be concise and specific. For actual keyframe image generation, the user uses the Keyframe Creation scene cards on the Kanban board.`,

@@ -12,7 +12,9 @@ export type StoryMuseTask =
   | 'visual_keyframe_prompt'
   | 'character_visual_prompt'
   | 'character_brief_suggestion'
-  | 'character_design_enhance';
+  | 'character_design_enhance'
+  | 'environment_brief_suggestion'
+  | 'environment_design_enhance';
 
 export interface StoryMuseOptions {
   task: StoryMuseTask;

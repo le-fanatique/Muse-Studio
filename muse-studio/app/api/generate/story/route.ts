@@ -28,6 +28,8 @@ function flowForTask(task: string): string {
     case 'character_design_enhance':
       return 'Character';
     case 'visual_keyframe_prompt':
+    case 'environment_brief_suggestion':
+    case 'environment_design_enhance':
       return 'Environment';
     default:
       return 'Story';

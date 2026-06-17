@@ -7,6 +7,8 @@ export const MUSE_PROMPT_TASKS = [
   'character_brief_suggestion',
   'character_design_enhance',
   'visual_keyframe_prompt',
+  'environment_brief_suggestion',
+  'environment_design_enhance',
   'generate_storyline',
   'rewrite_scene',
   'write_scene_script',

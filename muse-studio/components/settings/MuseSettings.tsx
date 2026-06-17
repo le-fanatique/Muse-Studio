@@ -60,6 +60,16 @@ const SECTIONS: SectionSpec[] = [
         label: 'Environment visual prompt',
         note: 'Used by Environment Muse prompt and Scene → Generate Image Prompt.',
       },
+      {
+        task: 'environment_brief_suggestion',
+        label: 'Suggest from Story prompt',
+        note: 'Used by Suggest from Story to draft description and design notes from the project storyline.',
+      },
+      {
+        task: 'environment_design_enhance',
+        label: 'Enhance Environment Brief prompt',
+        note: 'Used by Enhance Environment Brief to expand existing environment notes into a richer visual direction.',
+      },
     ],
   },
   {

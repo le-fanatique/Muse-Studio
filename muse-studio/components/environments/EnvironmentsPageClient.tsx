@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useTransition } from 'react';
-import { MapPin, Loader2, Sparkles, FileImage } from 'lucide-react';
+import { MapPin, Loader2, Sparkles, FileImage, Wand2, PenLine, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ManualImageUploadButton } from '@/components/media/ManualImageUploadButton';
@@ -9,6 +9,11 @@ import type { Environment, EnvironmentImage, StorylineContent } from '@/lib/type
 import type { LLMSettings } from '@/lib/actions/settings';
 import type { ComfyWorkflowSummary } from '@/lib/actions/comfyui';
 import { cn } from '@/lib/utils';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useStoryMuse } from '@/hooks/useStoryMuse';
 import {
   createEnvironment,
@@ -20,6 +25,15 @@ import {
 import { EnvironmentComfyGenerateDialog } from '@/components/environments/EnvironmentComfyGenerateDialog';
 
 const NO_TYPE_LABEL = 'No type';
+
+function parseBriefSuggestion(text: string): { description: string; designNotes: string } {
+  const descMatch = /DESCRIPTION:\s*([\s\S]*?)(?=DESIGN_NOTES:|$)/i.exec(text);
+  const notesMatch = /DESIGN_NOTES:\s*([\s\S]*?)$/i.exec(text);
+  return {
+    description: descMatch?.[1]?.trim() ?? '',
+    designNotes: notesMatch?.[1]?.trim() ?? '',
+  };
+}
 
 function groupEnvironmentsByType(environments: Environment[]): Record<string, Environment[]> {
   const map: Record<string, Environment[]> = {};
@@ -78,6 +92,10 @@ export function EnvironmentsPageClient({
   const [promptPendingId, setPromptPendingId] = useState<string | null>(null);
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [imageTargetId, setImageTargetId] = useState<string | null>(null);
+  const [wbPending, setWbPending] = useState<{ id: string; action: 'suggest' | 'enhance' } | null>(null);
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [editDesc, setEditDesc] = useState('');
+  const [editNotes, setEditNotes] = useState('');
 
   const selectedEnvironment = selectedId
     ? (environments.find((e) => e.id === selectedId) ?? null)
@@ -159,7 +177,7 @@ export function EnvironmentsPageClient({
                     <li key={env.id}>
                       <button
                         type="button"
-                        onClick={() => setSelectedId(env.id)}
+                        onClick={() => { setSelectedId(env.id); setIsEditingDetails(false); }}
                         className={cn(
                           'w-full text-left rounded-lg px-2.5 py-2 text-xs transition-colors',
                           selectedId === env.id
@@ -301,12 +319,24 @@ export function EnvironmentsPageClient({
                 </div>
 
                 <div className="flex items-center gap-2">
+                  {!isEditingDetails && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-xs gap-1.5"
+                      onClick={() => startEditDetails(selectedEnvironment)}
+                    >
+                      <Pencil className="h-3 w-3" />
+                      Edit details
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     className="text-xs"
-                    onClick={() => setSelectedId(null)}
+                    onClick={() => { setSelectedId(null); setIsEditingDetails(false); }}
                   >
                     New environment
                   </Button>
@@ -324,19 +354,121 @@ export function EnvironmentsPageClient({
                 </div>
               </div>
 
-              {selectedEnvironment.description && (
-                <div>
-                  <p className="text-[11px] font-medium text-muted-foreground mb-1">Description</p>
-                  <p className="text-xs text-foreground/90">{selectedEnvironment.description}</p>
+              {isEditingDetails ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className="mb-1.5 block text-[11px] font-medium text-muted-foreground">
+                      Description
+                    </label>
+                    <Textarea
+                      value={editDesc}
+                      onChange={(e) => setEditDesc(e.target.value)}
+                      rows={3}
+                      className="resize-none bg-white/5 border-white/10 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-[11px] font-medium text-muted-foreground">
+                      Design Notes
+                    </label>
+                    <Textarea
+                      value={editNotes}
+                      onChange={(e) => setEditNotes(e.target.value)}
+                      rows={4}
+                      className="resize-none bg-white/5 border-white/10 text-xs"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-8 gap-1.5 bg-violet-600 text-xs hover:bg-violet-500"
+                      onClick={() => handleSaveDetails(selectedEnvironment)}
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs"
+                      onClick={() => setIsEditingDetails(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
                 </div>
+              ) : (
+                <>
+                  {selectedEnvironment.description && (
+                    <div>
+                      <p className="text-[11px] font-medium text-muted-foreground mb-1">Description</p>
+                      <p className="text-xs text-foreground/90">{selectedEnvironment.description}</p>
+                    </div>
+                  )}
+                  {selectedEnvironment.designNotes && (
+                    <div>
+                      <p className="text-[11px] font-medium text-muted-foreground mb-1">Design Notes</p>
+                      <p className="text-xs text-foreground/90 whitespace-pre-wrap">
+                        {selectedEnvironment.designNotes}
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
 
-              {selectedEnvironment.designNotes && (
-                <div>
-                  <p className="text-[11px] font-medium text-muted-foreground mb-1">Design Notes</p>
-                  <p className="text-xs text-foreground/90 whitespace-pre-wrap">
-                    {selectedEnvironment.designNotes}
-                  </p>
+              {/* World-building AI actions */}
+              {!isEditingDetails && (
+                <div className="flex items-center gap-2">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="xs"
+                          disabled={!!wbPending || storyMuse.isGenerating}
+                          onClick={() => handleSuggestFromStory(selectedEnvironment)}
+                          className="h-7 gap-1 rounded-full border-violet-500/40 bg-violet-500/10 text-[11px] text-violet-100 hover:bg-violet-500/20"
+                        >
+                          {wbPending?.id === selectedEnvironment.id && wbPending.action === 'suggest' ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Wand2 className="h-3 w-3" />
+                          )}
+                          Suggest from Story
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      Suggests a description and design notes from the project storyline. Existing filled fields are preserved.
+                    </TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="xs"
+                          disabled={!selectedEnvironment.designNotes?.trim() || !!wbPending || storyMuse.isGenerating}
+                          onClick={() => handleEnhanceDecorBrief(selectedEnvironment)}
+                          className="h-7 gap-1 rounded-full border-violet-500/40 bg-violet-500/10 text-[11px] text-violet-100 hover:bg-violet-500/20"
+                        >
+                          {wbPending?.id === selectedEnvironment.id && wbPending.action === 'enhance' ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <PenLine className="h-3 w-3" />
+                          )}
+                          Enhance Environment Brief
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      Expands the current environment brief into a richer visual direction. This replaces Design Notes.
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
               )}
 
@@ -568,19 +700,15 @@ export function EnvironmentsPageClient({
     if (env.description) pieces.push(`Description: ${env.description}`);
     if (env.designNotes) pieces.push(`Design notes: ${env.designNotes}`);
     if (env.tags?.length) pieces.push(`Tags: ${env.tags.join(', ')}`);
-
-    // Add specific environment-related keywords
+    if (storyline?.logline) pieces.push(`Story logline: ${storyline.logline}`);
+    if (storyline?.genre) pieces.push(`Genre: ${storyline.genre}`);
+    if (storyline?.themes?.length) pieces.push(`Themes: ${storyline.themes.join(', ')}`);
     pieces.push('');
-    pieces.push('Focus on: décor, lieu, ambiance, lighting, mood, establishing shot, visual design.');
+    pieces.push('Focus on: set design, location, atmosphere, lighting, mood, establishing shot, visual design.');
 
-    const prompt = pieces.join('\n');
-
-    // NOTE: llmSettings and storyline are not available in EnvironmentsPageClientProps
-    // due to constraints. The generate call will proceed without them.
     const { text, error: genError } = await storyMuse.generate({
       task: 'visual_keyframe_prompt',
-      prompt,
-      projectId,
+      prompt: pieces.join('\n'),
       providerId: llmSettings.llmProvider,
       ollamaBaseUrl: llmSettings.ollamaBaseUrl,
       ollamaModel: llmSettings.ollamaModel,
@@ -611,6 +739,152 @@ export function EnvironmentsPageClient({
         setError(err instanceof Error ? err.message : 'Failed to save environment prompt.');
       } finally {
         setPromptPendingId(null);
+      }
+    });
+  }
+
+  async function handleSuggestFromStory(env: Environment) {
+    if (wbPending || storyMuse.isGenerating) return;
+    setWbPending({ id: env.id, action: 'suggest' });
+
+    const lines: string[] = ['ENVIRONMENT TO SUGGEST:', `Name: ${env.name}`];
+    if (env.environmentType) lines.push(`Type: ${env.environmentType}`);
+    if (env.description) lines.push(`Description: ${env.description}`);
+    if (env.designNotes) lines.push(`Existing design notes: ${env.designNotes}`);
+
+    lines.push('', 'PROJECT STORY CONTEXT:');
+    if (storyline?.logline) lines.push(`Logline: ${storyline.logline}`);
+    if (storyline?.genre) lines.push(`Genre: ${storyline.genre}`);
+    if (storyline?.themes?.length) lines.push(`Themes: ${storyline.themes.join(', ')}`);
+    if (storyline?.plotOutline) {
+      const short = storyline.plotOutline.slice(0, 600);
+      lines.push(`Plot outline: ${short}${storyline.plotOutline.length > 600 ? '…' : ''}`);
+    }
+
+    const { text, error: genError } = await storyMuse.generate({
+      task: 'environment_brief_suggestion',
+      prompt: lines.join('\n'),
+      providerId: llmSettings.llmProvider,
+      ollamaBaseUrl: llmSettings.ollamaBaseUrl,
+      ollamaModel: llmSettings.ollamaModel,
+      openaiModel: llmSettings.openaiModel,
+      claudeModel: llmSettings.claudeModel,
+      lmstudioBaseUrl: llmSettings.lmstudioBaseUrl,
+      lmstudioModel: llmSettings.lmstudioModel,
+      openrouterModel: llmSettings.openrouterModel,
+      openrouterBaseUrl: llmSettings.openrouterBaseUrl,
+      maxTokens: 512,
+      temperature: 0.8,
+    });
+
+    if (genError) {
+      setError(genError);
+      setWbPending(null);
+      return;
+    }
+
+    const parsed = parseBriefSuggestion(text);
+    const updates: { description?: string; designNotes?: string } = {};
+    if (parsed.description && !env.description) updates.description = parsed.description;
+    if (parsed.designNotes && !env.designNotes) updates.designNotes = parsed.designNotes;
+
+    if (Object.keys(updates).length > 0) {
+      setEnvironments((prev) => prev.map((e) => (e.id === env.id ? { ...e, ...updates } : e)));
+      startTransition(async () => {
+        try {
+          await updateEnvironment(env.id, updates);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Failed to save environment.');
+        } finally {
+          setWbPending(null);
+        }
+      });
+    } else {
+      setWbPending(null);
+    }
+  }
+
+  async function handleEnhanceDecorBrief(env: Environment) {
+    if (wbPending || storyMuse.isGenerating) return;
+    setWbPending({ id: env.id, action: 'enhance' });
+
+    const lines: string[] = ['ENVIRONMENT TO ENHANCE:', `Name: ${env.name}`];
+    if (env.environmentType) lines.push(`Type: ${env.environmentType}`);
+    if (env.description) lines.push(`Description: ${env.description}`);
+    if (env.designNotes) lines.push(`Existing design notes: ${env.designNotes}`);
+
+    lines.push('', 'TASK:');
+    lines.push(
+      'Rewrite and expand the Existing design notes above into a richer, more specific visual direction. Preserve every explicit user constraint. Do not describe any other location.',
+    );
+
+    const toneLines: string[] = [];
+    if (storyline?.logline) toneLines.push(`Logline: ${storyline.logline}`);
+    if (storyline?.genre) toneLines.push(`Genre: ${storyline.genre}`);
+    if (storyline?.themes?.length) toneLines.push(`Themes: ${storyline.themes.join(', ')}`);
+    if (toneLines.length > 0) {
+      lines.push('', 'STORY CONTEXT, for tone only:', ...toneLines);
+    }
+
+    const { text, error: genError } = await storyMuse.generate({
+      task: 'environment_design_enhance',
+      prompt: lines.join('\n'),
+      providerId: llmSettings.llmProvider,
+      ollamaBaseUrl: llmSettings.ollamaBaseUrl,
+      ollamaModel: llmSettings.ollamaModel,
+      openaiModel: llmSettings.openaiModel,
+      claudeModel: llmSettings.claudeModel,
+      lmstudioBaseUrl: llmSettings.lmstudioBaseUrl,
+      lmstudioModel: llmSettings.lmstudioModel,
+      openrouterModel: llmSettings.openrouterModel,
+      openrouterBaseUrl: llmSettings.openrouterBaseUrl,
+      maxTokens: 512,
+      temperature: 0.7,
+    });
+
+    if (genError) {
+      setError(genError);
+      setWbPending(null);
+      return;
+    }
+
+    const enhanced = text.trim();
+    if (enhanced) {
+      setEnvironments((prev) =>
+        prev.map((e) => (e.id === env.id ? { ...e, designNotes: enhanced } : e)),
+      );
+      startTransition(async () => {
+        try {
+          await updateEnvironment(env.id, { designNotes: enhanced });
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Failed to save environment.');
+        } finally {
+          setWbPending(null);
+        }
+      });
+    } else {
+      setWbPending(null);
+    }
+  }
+
+  function startEditDetails(env: Environment) {
+    setEditDesc(env.description ?? '');
+    setEditNotes(env.designNotes ?? '');
+    setIsEditingDetails(true);
+  }
+
+  async function handleSaveDetails(env: Environment) {
+    const updates = {
+      description: editDesc.trim(),
+      designNotes: editNotes.trim(),
+    };
+    setEnvironments((prev) => prev.map((e) => (e.id === env.id ? { ...e, ...updates } : e)));
+    setIsEditingDetails(false);
+    startTransition(async () => {
+      try {
+        await updateEnvironment(env.id, updates);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to save details.');
       }
     });
   }
