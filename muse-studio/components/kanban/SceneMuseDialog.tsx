@@ -119,6 +119,7 @@ interface SceneMuseDialogProps {
   onSceneRewritten?: (sceneId: string, updates: { heading: string; description: string }) => void;
   /** Called after a keyframe is saved — move the card to KEYFRAME column. */
   onKeyframeSaved?: (sceneId: string, keyframeId: string, prompt: string) => void;
+  projectId?: string;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -129,6 +130,7 @@ export function SceneMuseDialog({
   onClose,
   onSceneRewritten,
   onKeyframeSaved,
+  projectId,
 }: SceneMuseDialogProps) {
   const router = useRouter();
   const [mode, setMode] = useState<SceneMuseMode>('rewrite_llm');
@@ -261,6 +263,7 @@ export function SceneMuseDialog({
     await storyMuse.generate({
       task: cfg.taskId as Parameters<typeof storyMuse.generate>[0]['task'],
       prompt: buildUserMessage(),
+      projectId: mode === 'image_prompt' ? projectId : undefined,
       providerId: llmSettings.llmProvider,
       ollamaBaseUrl: llmSettings.ollamaBaseUrl,
       ollamaModel: llmSettings.ollamaModel,

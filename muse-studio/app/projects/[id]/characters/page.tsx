@@ -43,6 +43,7 @@ export default async function ProjectCharactersPage({ params }: PageProps) {
           storyline: project.storyline,
           storylineSource: project.storylineSource,
           scenes: project.scenes,
+          promptConvention: project.promptConvention,
         }}
       />
 

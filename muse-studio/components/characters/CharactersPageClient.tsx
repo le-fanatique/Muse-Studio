@@ -772,6 +772,32 @@ export function CharactersPageClient({
                 />
               </div>
 
+              <div className="space-y-1.5">
+                <p className="text-[11px] font-medium text-muted-foreground/80">
+                  Negative Prompt
+                </p>
+                <Textarea
+                  value={selectedCharacter.promptNegative ?? ''}
+                  onChange={(e) => {
+                    const next = characters.map((c) =>
+                      c.id === selectedCharacter.id ? { ...c, promptNegative: e.target.value } : c,
+                    );
+                    setCharacters(next);
+                  }}
+                  onBlur={() => {
+                    const current = characters.find((c) => c.id === selectedCharacter.id);
+                    if (current?.promptNegative !== undefined) {
+                      updateCharacter(selectedCharacter.id, {
+                        promptNegative: current.promptNegative,
+                      }).catch(() => setError('Failed to save negative prompt.'));
+                    }
+                  }}
+                  rows={2}
+                  placeholder="What should be avoided in generated images?"
+                  className="resize-none bg-black/20 border-white/10 text-xs placeholder:text-muted-foreground/40"
+                />
+              </div>
+
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-[11px] font-medium text-muted-foreground/75">

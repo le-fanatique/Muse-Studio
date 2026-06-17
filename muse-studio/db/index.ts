@@ -295,6 +295,11 @@ function applySchema(database: Database.Database): void {
     );
   `);
 
+  // Backfill prompt_convention on existing projects
+  try {
+    database.exec(`ALTER TABLE projects ADD COLUMN prompt_convention TEXT`);
+  } catch { /* column already exists */ }
+
   // Backfill comfy workflow columns on existing scenes tables
   try {
     database.exec(`ALTER TABLE scenes ADD COLUMN comfy_image_workflow_id TEXT`);

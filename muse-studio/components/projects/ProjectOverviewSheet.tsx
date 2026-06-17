@@ -1,7 +1,11 @@
 'use client';
 
+import { useState, useTransition } from 'react';
 import { BookOpen, Sparkles, Upload, PenLine, Users } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { updateProject } from '@/lib/actions/projects';
 import type { ProjectOverview, StorylineSource } from '@/lib/types';
 
 const STORYLINE_SOURCE_LABELS: Record<StorylineSource, string> = {
@@ -14,17 +18,51 @@ export interface ProjectOverviewSheetProps {
   project: ProjectOverview;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  projectId?: string;
 }
 
-export function ProjectOverviewSheet({ project, open, onOpenChange }: ProjectOverviewSheetProps) {
+export function ProjectOverviewSheet({ project, open, onOpenChange, projectId }: ProjectOverviewSheetProps) {
   const { title, description, storyline, storylineSource } = project;
   const characters = storyline?.characters ?? [];
+
+  const [logline, setLogline] = useState(storyline?.logline ?? '');
+  const [plotOutline, setPlotOutline] = useState(storyline?.plotOutline ?? '');
+  const [genre, setGenre] = useState(storyline?.genre ?? '');
+  const [themes, setThemes] = useState((storyline?.themes ?? []).join(', '));
+  const [convention, setConvention] = useState(project.promptConvention ?? '');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
+  const [isPending, startTransition] = useTransition();
+
   const SourceIcon =
     storylineSource === 'MUSE_GENERATED'
       ? Sparkles
       : storylineSource === 'UPLOAD'
         ? Upload
         : PenLine;
+
+  const isEditable = !!projectId;
+
+  function handleSave() {
+    if (!projectId) return;
+    startTransition(async () => {
+      try {
+        await updateProject(projectId, {
+          promptConvention: convention,
+          storylineLogline: logline,
+          storylinePlotOutline: plotOutline,
+          storylineGenre: genre,
+          storylineThemes: themes
+            .split(',')
+            .map((t) => t.trim())
+            .filter(Boolean),
+        });
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 2000);
+      } catch {
+        setSaveStatus('error');
+      }
+    });
+  }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -39,7 +77,9 @@ export function ProjectOverviewSheet({ project, open, onOpenChange }: ProjectOve
             Project overview
           </SheetTitle>
           <SheetDescription className="text-xs text-muted-foreground">
-            A quick reminder of this project — title, storyline, and cast.
+            {isEditable
+              ? 'Edit storyline fields and visual style guide, then save.'
+              : 'A quick reminder of this project — title, storyline, and cast.'}
           </SheetDescription>
         </SheetHeader>
 
@@ -68,12 +108,56 @@ export function ProjectOverviewSheet({ project, open, onOpenChange }: ProjectOve
             </div>
           </section>
 
-          {/* Storyline (narrative only — characters listed separately) */}
+          {/* Storyline — editable when projectId is set */}
           <section>
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
               Storyline
             </h3>
-            {!storyline ? (
+            {isEditable ? (
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase">Logline</p>
+                  <Textarea
+                    value={logline}
+                    onChange={(e) => setLogline(e.target.value)}
+                    rows={2}
+                    placeholder="One-sentence premise of your film."
+                    className="resize-none bg-black/20 border-white/10 text-xs placeholder:text-muted-foreground/40"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase">Plot outline</p>
+                  <Textarea
+                    value={plotOutline}
+                    onChange={(e) => setPlotOutline(e.target.value)}
+                    rows={4}
+                    placeholder="The full story arc: setup, rising action, climax, resolution."
+                    className="resize-none bg-black/20 border-white/10 text-xs placeholder:text-muted-foreground/40"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase">Genre</p>
+                  <input
+                    type="text"
+                    value={genre}
+                    onChange={(e) => setGenre(e.target.value)}
+                    placeholder="e.g. Neo-noir thriller"
+                    className="w-full rounded-md border border-white/10 bg-black/20 px-3 py-1.5 text-xs placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-violet-500/50"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase">Themes</p>
+                  <input
+                    type="text"
+                    value={themes}
+                    onChange={(e) => setThemes(e.target.value)}
+                    placeholder="e.g. redemption, obsession, identity"
+                    className="w-full rounded-md border border-white/10 bg-black/20 px-3 py-1.5 text-xs placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-violet-500/50"
+                  />
+                  <p className="text-[10px] text-muted-foreground/50">Comma-separated.</p>
+                </div>
+              </div>
+            ) : !storyline ? (
               <p className="text-sm text-muted-foreground rounded-lg border border-white/8 bg-white/5 px-3 py-4">
                 No storyline yet.
               </p>
@@ -81,35 +165,25 @@ export function ProjectOverviewSheet({ project, open, onOpenChange }: ProjectOve
               <div className="rounded-xl border border-white/8 bg-white/5 p-4 space-y-3 text-sm">
                 {storyline.logline && (
                   <div>
-                    <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-0.5">
-                      Logline
-                    </p>
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-0.5">Logline</p>
                     <p className="text-foreground/90 leading-relaxed">{storyline.logline}</p>
                   </div>
                 )}
                 {storyline.plotOutline ? (
                   <div>
-                    <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-0.5">
-                      Plot outline
-                    </p>
-                    <p className="text-foreground/90 leading-relaxed whitespace-pre-wrap">
-                      {storyline.plotOutline}
-                    </p>
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-0.5">Plot outline</p>
+                    <p className="text-foreground/90 leading-relaxed whitespace-pre-wrap">{storyline.plotOutline}</p>
                   </div>
                 ) : null}
                 {storyline.genre && (
                   <div>
-                    <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-0.5">
-                      Genre
-                    </p>
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-0.5">Genre</p>
                     <p className="text-foreground/90">{storyline.genre}</p>
                   </div>
                 )}
                 {storyline.themes?.length > 0 && (
                   <div>
-                    <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-0.5">
-                      Themes
-                    </p>
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-0.5">Themes</p>
                     <p className="text-foreground/90">{storyline.themes.join(', ')}</p>
                   </div>
                 )}
@@ -141,7 +215,46 @@ export function ProjectOverviewSheet({ project, open, onOpenChange }: ProjectOve
               </ul>
             )}
           </section>
+
+          {/* Visual Style Guide */}
+          {isEditable && (
+            <section>
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                Visual Style Guide
+              </h3>
+              <p className="text-[11px] text-muted-foreground/70 mb-1.5">
+                Used as project context for visual Muse prompts.
+              </p>
+              <Textarea
+                value={convention}
+                onChange={(e) => setConvention(e.target.value)}
+                rows={4}
+                placeholder="Describe the global visual style, rendering direction, lighting, palette, and constraints for this project."
+                className="resize-none bg-black/20 border-white/10 text-xs placeholder:text-muted-foreground/40"
+              />
+            </section>
+          )}
         </div>
+
+        {/* Sticky footer — Save button */}
+        {isEditable && (
+          <div className="shrink-0 border-t border-white/8 px-5 pt-3 pb-16 flex items-center gap-3">
+            {saveStatus === 'error' && (
+              <p className="text-xs text-red-400">Failed to save project overview.</p>
+            )}
+            {saveStatus === 'saved' && (
+              <p className="text-xs text-emerald-400">Saved</p>
+            )}
+            <Button
+              size="sm"
+              disabled={isPending}
+              onClick={handleSave}
+              className="ml-auto text-xs"
+            >
+              {isPending ? 'Saving...' : 'Save changes'}
+            </Button>
+          </div>
+        )}
       </SheetContent>
     </Sheet>
   );

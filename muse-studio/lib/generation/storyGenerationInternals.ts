@@ -201,6 +201,11 @@ export function formatProjectForRag(project: Project): string {
     }
   }
 
+  if (project.promptConvention) {
+    lines.push('---');
+    lines.push(`VISUAL STYLE GUIDE: ${project.promptConvention}`);
+  }
+
   if (project.scenes?.length) {
     lines.push('---');
     lines.push('Scenes');

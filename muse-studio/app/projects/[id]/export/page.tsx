@@ -35,6 +35,7 @@ export default async function ExportFilmPage({ params }: PageProps) {
           storyline: project.storyline,
           storylineSource: project.storylineSource,
           scenes: project.scenes,
+          promptConvention: project.promptConvention,
         }}
       />
 

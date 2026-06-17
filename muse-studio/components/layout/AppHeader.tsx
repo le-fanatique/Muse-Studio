@@ -319,6 +319,7 @@ export function AppHeader({
           project={overviewProject}
           open={overviewOpen}
           onOpenChange={setOverviewOpen}
+          projectId={projectId}
         />
       )}
     </>

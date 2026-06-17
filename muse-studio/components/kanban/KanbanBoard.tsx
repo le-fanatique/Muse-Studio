@@ -517,6 +517,7 @@ export function KanbanBoard({
         }}
         onSceneRewritten={handleSceneRewritten}
         onKeyframeSaved={handleKeyframeSaved}
+        projectId={projectId}
       />
 
       {/* Video review */}

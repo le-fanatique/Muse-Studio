@@ -86,6 +86,7 @@ export default async function ProjectKanbanPage({ params, searchParams }: PagePr
           storyline: project.storyline,
           storylineSource: project.storylineSource,
           scenes: project.scenes,
+          promptConvention: project.promptConvention,
         }}
       />
 

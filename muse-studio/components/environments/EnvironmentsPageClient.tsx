@@ -710,6 +710,7 @@ export function EnvironmentsPageClient({
     const { text, error: genError } = await storyMuse.generate({
       task: 'visual_keyframe_prompt',
       prompt: pieces.join('\n'),
+      projectId,
       providerId: llmSettings.llmProvider,
       ollamaBaseUrl: llmSettings.ollamaBaseUrl,
       ollamaModel: llmSettings.ollamaModel,
@@ -765,6 +766,7 @@ export function EnvironmentsPageClient({
     const { text, error: genError } = await storyMuse.generate({
       task: 'environment_brief_suggestion',
       prompt: lines.join('\n'),
+      projectId,
       providerId: llmSettings.llmProvider,
       ollamaBaseUrl: llmSettings.ollamaBaseUrl,
       ollamaModel: llmSettings.ollamaModel,
@@ -830,6 +832,7 @@ export function EnvironmentsPageClient({
     const { text, error: genError } = await storyMuse.generate({
       task: 'environment_design_enhance',
       prompt: lines.join('\n'),
+      projectId,
       providerId: llmSettings.llmProvider,
       ollamaBaseUrl: llmSettings.ollamaBaseUrl,
       ollamaModel: llmSettings.ollamaModel,

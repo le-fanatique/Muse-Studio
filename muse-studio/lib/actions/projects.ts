@@ -27,6 +27,7 @@ interface ProjectRow {
   current_stage: string;
   active_muse: string;
   muse_control_level: string;
+  prompt_convention: string | null;
   created_at: string;
   updated_at: string;
   scene_count?: number;
@@ -219,6 +220,7 @@ function mapProject(row: ProjectRow, scenes: Scene[]): Project {
     currentStage: row.current_stage as Project['currentStage'],
     activeMuse: row.active_muse as Project['activeMuse'],
     museControlLevel: row.muse_control_level as Project['museControlLevel'],
+    promptConvention: row.prompt_convention ?? undefined,
     scenes,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
@@ -373,6 +375,11 @@ export async function updateProject(
     currentStage: Project['currentStage'];
     activeMuse: Project['activeMuse'];
     museControlLevel: Project['museControlLevel'];
+    promptConvention: string;
+    storylineLogline: string;
+    storylinePlotOutline: string;
+    storylineGenre: string;
+    storylineThemes: string[];
   }>,
 ): Promise<void> {
   const now = new Date().toISOString();
@@ -385,6 +392,11 @@ export async function updateProject(
   if (data.currentStage !== undefined) { fields.push('current_stage = ?'); values.push(data.currentStage); }
   if (data.activeMuse !== undefined) { fields.push('active_muse = ?'); values.push(data.activeMuse); }
   if (data.museControlLevel !== undefined) { fields.push('muse_control_level = ?'); values.push(data.museControlLevel); }
+  if (data.promptConvention !== undefined) { fields.push('prompt_convention = ?'); values.push(data.promptConvention || null); }
+  if (data.storylineLogline !== undefined) { fields.push('storyline_logline = ?'); values.push(data.storylineLogline || null); }
+  if (data.storylinePlotOutline !== undefined) { fields.push('storyline_plot_outline = ?'); values.push(data.storylinePlotOutline || null); }
+  if (data.storylineGenre !== undefined) { fields.push('storyline_genre = ?'); values.push(data.storylineGenre || null); }
+  if (data.storylineThemes !== undefined) { fields.push('storyline_themes = ?'); values.push(JSON.stringify(data.storylineThemes)); }
 
   values.push(id);
   db.prepare(`UPDATE projects SET ${fields.join(', ')} WHERE id = ?`).run(...(values as Parameters<typeof db.prepare>[0][]));

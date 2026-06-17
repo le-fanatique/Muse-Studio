@@ -43,6 +43,7 @@ export default async function ProjectEnvironmentsPage({ params }: PageProps) {
           storyline: project.storyline,
           storylineSource: project.storylineSource,
           scenes: project.scenes,
+          promptConvention: project.promptConvention,
         }}
       />
 

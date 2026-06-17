@@ -171,14 +171,15 @@ export interface Project {
   activeMuse: MuseAgent;
   scenes: Scene[];
   museControlLevel: MuseControlLevel;
+  promptConvention?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
-/** Minimal project data for the read-only overview sheet (title, description, storyline, source, scenes). */
+/** Minimal project data for the overview sheet. */
 export type ProjectOverview = Pick<
   Project,
-  'title' | 'description' | 'storyline' | 'storylineSource' | 'scenes'
+  'title' | 'description' | 'storyline' | 'storylineSource' | 'scenes' | 'promptConvention'
 >;
 
 export interface MuseSuggestion {

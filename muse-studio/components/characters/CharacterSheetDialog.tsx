@@ -658,6 +658,32 @@ export function CharacterSheetDialog({
                       />
                     </div>
 
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] font-medium text-muted-foreground/80">
+                        Negative Prompt
+                      </p>
+                      <Textarea
+                        value={char.promptNegative ?? ''}
+                        onChange={(e) => {
+                          const next = characters.map((c) =>
+                            c.id === char.id ? { ...c, promptNegative: e.target.value } : c,
+                          );
+                          onCharactersChange(next);
+                        }}
+                        onBlur={() => {
+                          const current = characters.find((c) => c.id === char.id);
+                          if (current?.promptNegative !== undefined) {
+                            updateCharacter(char.id, {
+                              promptNegative: current.promptNegative,
+                            }).catch(console.error);
+                          }
+                        }}
+                        rows={2}
+                        placeholder="What should be avoided in generated images?"
+                        className="resize-none bg-black/20 border-white/10 text-xs placeholder:text-muted-foreground/40"
+                      />
+                    </div>
+
                     {/* Character reference images */}
                     {char.images && char.images.length > 0 && (
                       <div className="mt-2 space-y-1.5">
