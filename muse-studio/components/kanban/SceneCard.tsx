@@ -77,6 +77,8 @@ export function SceneCard({ scene, onAskMuse, onCast, onDetail, onClick, ctaLabe
         {...(!isGenerating ? listeners : {})}
         {...(!isGenerating ? attributes : {})}
         suppressHydrationWarning
+        title={!isGenerating ? 'Drag to reorder' : undefined}
+        aria-label={!isGenerating ? 'Drag to reorder scene' : undefined}
         className={cn(
           'absolute left-0 top-0 flex h-full w-6 items-center justify-center rounded-l-xl opacity-0 transition-opacity group-hover:opacity-100',
           isGenerating ? 'cursor-not-allowed opacity-40 group-hover:opacity-40' : 'cursor-grab active:cursor-grabbing',

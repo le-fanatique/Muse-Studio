@@ -29,9 +29,14 @@ function flowForTask(task: string): string {
     case 'character_design_enhance':
       return 'Character';
     case 'visual_keyframe_prompt':
+      return 'VisualKeyframe';
     case 'environment_brief_suggestion':
     case 'environment_design_enhance':
       return 'Environment';
+    case 'general_query':
+    case 'visual_query':
+    case 'motion_query':
+      return 'AskMuse';
     default:
       return 'Story';
   }
