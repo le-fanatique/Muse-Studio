@@ -2,7 +2,7 @@
 
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { Sparkles, GripVertical, ImageIcon, Video, CheckCircle2, Loader2, Clock, Users } from 'lucide-react';
+import { Sparkles, GripVertical, ImageIcon, Video, CheckCircle2, Loader2, Clock, Users, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import type { Scene } from '@/lib/types';
@@ -11,6 +11,7 @@ interface SceneCardProps {
   scene: Scene;
   onAskMuse?: () => void;
   onCast?: () => void;
+  onDetail?: () => void;
   onClick?: () => void;
   ctaLabel?: string;
 }
@@ -43,7 +44,7 @@ function StatusIndicator({ status }: { status: Scene['status'] }) {
   return null;
 }
 
-export function SceneCard({ scene, onAskMuse, onCast, onClick, ctaLabel }: SceneCardProps) {
+export function SceneCard({ scene, onAskMuse, onCast, onDetail, onClick, ctaLabel }: SceneCardProps) {
   const isGenerating = scene.status === 'GENERATING';
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: scene.id,
@@ -93,16 +94,31 @@ export function SceneCard({ scene, onAskMuse, onCast, onClick, ctaLabel }: Scene
             </span>
             <span className="text-sm font-medium leading-tight line-clamp-1">{scene.title}</span>
           </div>
-          {onCast && scene.status !== 'GENERATING' && (
-            <button
-              type="button"
-              title="Cast & Location"
-              aria-label="Cast & Location"
-              onClick={(e) => { e.stopPropagation(); onCast(); }}
-              className="shrink-0 flex h-5 w-5 items-center justify-center rounded-md text-muted-foreground/40 opacity-0 transition-opacity group-hover:opacity-100 hover:text-blue-300 hover:bg-blue-500/10"
-            >
-              <Users className="h-3 w-3" />
-            </button>
+          {(onDetail || onCast) && scene.status !== 'GENERATING' && (
+            <div className="flex items-center gap-0.5 shrink-0">
+              {onDetail && (
+                <button
+                  type="button"
+                  title="Scene details"
+                  aria-label="Scene details"
+                  onClick={(e) => { e.stopPropagation(); onDetail(); }}
+                  className="flex h-5 w-5 items-center justify-center rounded-md text-muted-foreground/40 opacity-0 transition-opacity group-hover:opacity-100 hover:text-slate-300 hover:bg-white/10"
+                >
+                  <Info className="h-3 w-3" />
+                </button>
+              )}
+              {onCast && (
+                <button
+                  type="button"
+                  title="Cast & Location"
+                  aria-label="Cast & Location"
+                  onClick={(e) => { e.stopPropagation(); onCast(); }}
+                  className="flex h-5 w-5 items-center justify-center rounded-md text-muted-foreground/40 opacity-0 transition-opacity group-hover:opacity-100 hover:text-blue-300 hover:bg-blue-500/10"
+                >
+                  <Users className="h-3 w-3" />
+                </button>
+              )}
+            </div>
           )}
         </div>
 

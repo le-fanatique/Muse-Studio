@@ -15,6 +15,7 @@ interface SceneDetailSheetProps {
   isOpen: boolean;
   onClose: () => void;
   onAskMuse?: () => void;
+  onKeyframeDeleted?: (keyframeId: string) => void;
 }
 
 const STATUS_LABELS: Record<Scene['status'], string> = {
@@ -26,7 +27,7 @@ const STATUS_LABELS: Record<Scene['status'], string> = {
   FINAL: 'Final',
 };
 
-export function SceneDetailSheet({ scene, isOpen, onClose, onAskMuse }: SceneDetailSheetProps) {
+export function SceneDetailSheet({ scene, isOpen, onClose, onAskMuse, onKeyframeDeleted }: SceneDetailSheetProps) {
   const [isPending, startTransition] = useTransition();
 
   if (!scene) return null;
@@ -156,7 +157,10 @@ export function SceneDetailSheet({ scene, isOpen, onClose, onAskMuse }: SceneDet
                       <button
                         onClick={() => {
                           if (!window.confirm('Delete this keyframe?')) return;
-                          startTransition(() => deleteKeyframe(kf.keyframeId));
+                          startTransition(async () => {
+                            await deleteKeyframe(kf.keyframeId);
+                            onKeyframeDeleted?.(kf.keyframeId);
+                          });
                         }}
                         disabled={isPending}
                         aria-label="Delete keyframe"

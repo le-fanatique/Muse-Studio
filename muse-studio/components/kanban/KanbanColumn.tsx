@@ -14,6 +14,7 @@ interface KanbanColumnProps {
   scenes: Scene[];
   onAskMuse?: (scene: Scene) => void;
   onCast?: (scene: Scene) => void;
+  onOpenDetail?: (scene: Scene) => void;
   onAddScene?: () => void;
   onOpenKeyframe?: (scene: Scene) => void;
   onOpenVideoGenerate?: (scene: Scene) => void;
@@ -26,6 +27,7 @@ export function KanbanColumn({
   scenes,
   onAskMuse,
   onCast,
+  onOpenDetail,
   onAddScene,
   onOpenKeyframe,
   onOpenVideoGenerate,
@@ -98,6 +100,7 @@ export function KanbanColumn({
               key={scene.id}
               scene={scene}
               onCast={onCast ? () => onCast(scene) : undefined}
+              onDetail={onOpenDetail ? () => onOpenDetail(scene) : undefined}
               onAskMuse={
                 isPendingApproval || isFinal
                   ? undefined

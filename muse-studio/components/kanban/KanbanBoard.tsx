@@ -14,6 +14,7 @@ import {
 import { KanbanColumn } from './KanbanColumn';
 import { SceneCard } from './SceneCard';
 import { AddSceneDialog } from './AddSceneDialog';
+import { SceneDetailSheet } from './SceneDetailSheet';
 import { SceneMuseDialog } from './SceneMuseDialog';
 import { SceneCastDialog } from './SceneCastDialog';
 import { VideoReviewDialog } from './VideoReviewDialog';
@@ -115,6 +116,7 @@ export function KanbanBoard({
   const [comfyGenerateWorkflowId, setComfyGenerateWorkflowId] = useState<string | null>(null);
 
   const [castScene, setCastScene] = useState<Scene | null>(null);
+  const [detailScene, setDetailScene] = useState<Scene | null>(null);
 
   // sceneId → jobId for background polling of GENERATING scenes
   const [pendingJobs, setPendingJobs] = useState<Record<string, string>>({});
@@ -264,6 +266,25 @@ export function KanbanBoard({
 
   function handleOpenCast(scene: Scene) {
     setCastScene(scene);
+  }
+
+  function handleOpenDetail(scene: Scene) {
+    setDetailScene(scene);
+  }
+
+  function handleKeyframeDeletedFromDetail(keyframeId: string) {
+    setScenes((prev) =>
+      prev.map((s) =>
+        s.keyframes.some((k) => k.keyframeId === keyframeId)
+          ? { ...s, keyframes: s.keyframes.filter((k) => k.keyframeId !== keyframeId) }
+          : s,
+      ),
+    );
+    setDetailScene((prev) =>
+      prev
+        ? { ...prev, keyframes: prev.keyframes.filter((k) => k.keyframeId !== keyframeId) }
+        : prev,
+    );
   }
 
   function handleAskMuse(scene: Scene) {
@@ -438,6 +459,7 @@ export function KanbanBoard({
               scenes={columnMap[column.id]}
               onAskMuse={handleAskMuse}
               onCast={handleOpenCast}
+              onOpenDetail={handleOpenDetail}
               onAddScene={column.id === 'SCRIPT' ? () => setAddSceneOpen(true) : undefined}
               onOpenKeyframe={column.id === 'KEYFRAME' ? handleOpenKeyframePanel : undefined}
               onOpenVideoGenerate={column.id === 'DRAFT_QUEUE' ? handleOpenVideoGenerate : undefined}
@@ -464,6 +486,15 @@ export function KanbanBoard({
         characters={characters ?? []}
         environments={environments ?? []}
         onClose={() => setCastScene(null)}
+      />
+
+      {/* Scene Detail Sheet — keyframe thumbnails + per-keyframe delete */}
+      <SceneDetailSheet
+        isOpen={!!detailScene}
+        scene={detailScene}
+        onClose={() => setDetailScene(null)}
+        onAskMuse={detailScene ? () => handleAskMuse(detailScene) : undefined}
+        onKeyframeDeleted={handleKeyframeDeletedFromDetail}
       />
 
       {/* Add Scene */}
