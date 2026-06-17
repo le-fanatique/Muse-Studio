@@ -17,6 +17,7 @@ import {
   BookImage,
   Save,
   RefreshCw,
+  Users,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -188,6 +189,40 @@ export function SceneMuseDialog({
     onClose();
   }
 
+  function buildCastContext(): string {
+    if (!scene) return '';
+    const chars = scene.characters?.filter((c) => c.name) ?? [];
+    const env = scene.environment ?? null;
+    if (chars.length === 0 && !env) return '';
+
+    const MAX = 200;
+    const clip = (s: string) => (s.length > MAX ? `${s.slice(0, MAX)}…` : s);
+    const lines: string[] = ['CAST & LOCATION CONTEXT', ''];
+
+    if (chars.length > 0) {
+      lines.push('Characters in this scene:');
+      for (const c of chars) {
+        lines.push(`- ${c.name}`);
+        if (c.primaryRole) lines.push(`  Role: ${clip(c.primaryRole)}`);
+        if (c.shortBio) lines.push(`  Bio: ${clip(c.shortBio)}`);
+        if (c.designNotes) lines.push(`  Design: ${clip(c.designNotes)}`);
+        if (c.promptPositive) lines.push(`  Visual prompt: ${clip(c.promptPositive)}`);
+      }
+    }
+
+    if (env) {
+      if (chars.length > 0) lines.push('');
+      lines.push('Primary location:');
+      lines.push(`- ${env.name}`);
+      if (env.environmentType) lines.push(`  Type: ${clip(env.environmentType)}`);
+      if (env.description) lines.push(`  Description: ${clip(env.description)}`);
+      if (env.designNotes) lines.push(`  Design: ${clip(env.designNotes)}`);
+      if (env.promptPositive) lines.push(`  Visual prompt: ${clip(env.promptPositive)}`);
+    }
+
+    return lines.join('\n');
+  }
+
   function buildUserMessage(): string {
     if (!scene) return input;
 
@@ -203,14 +238,19 @@ export function SceneMuseDialog({
         .filter((p) => p !== null)
         .join('\n');
 
+      const castCtx = buildCastContext();
+      const contextBlock = castCtx ? `\n\n${castCtx}` : '';
+
       return input.trim()
-        ? `Instruction: "${input.trim()}"\n\n---\n\n${parts}`
-        : `Please rewrite and improve the following scene:\n\n---\n\n${parts}`;
+        ? `Instruction: "${input.trim()}"${contextBlock}\n\n---\n\n${parts}`
+        : `Please rewrite and improve the following scene.${castCtx ? ' Use the character and location context to maintain visual and narrative consistency.' : ''}${contextBlock}\n\n---\n\n${parts}`;
     }
 
     const sceneText = `Scene: ${scene.title}\nHeading: ${scene.heading}\nDescription: ${scene.description}`;
     const styleNote = input.trim() ? `\n\nStyle/Mood: ${input.trim()}` : '';
-    return `${sceneText}${styleNote}`;
+    const castCtx = buildCastContext();
+    const contextBlock = castCtx ? `\n\n${castCtx}` : '';
+    return `${sceneText}${styleNote}${contextBlock}`;
   }
 
   async function handleGenerate() {
@@ -395,6 +435,14 @@ export function SceneMuseDialog({
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3 min-h-0">
 
           <p className="text-xs text-muted-foreground/50">{cfg.hint}</p>
+
+          {/* Cast & Location context badge */}
+          {scene && ((scene.characters?.length ?? 0) > 0 || !!scene.environment) && (
+            <div className="flex items-center gap-1.5 rounded-md border border-blue-500/20 bg-blue-500/5 px-2.5 py-1.5">
+              <Users className="h-3 w-3 shrink-0 text-blue-400/70" />
+              <span className="text-[10px] text-blue-300/70">Using linked cast and location context</span>
+            </div>
+          )}
 
           {/* Scene preview toggle */}
           <button
