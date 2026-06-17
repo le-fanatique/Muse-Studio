@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import {
   X, Workflow, AlertCircle, CheckCircle2, Image as ImageIcon,
   Video, Loader2, Copy, Check, FileImage, FileAudio,
+  ChevronDown, ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -78,6 +79,8 @@ export function ComfyGenerateDialog({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [showValidationBanner, setShowValidationBanner] = useState(false);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
+  const [showOtherCharacters, setShowOtherCharacters] = useState(false);
+  const [showOtherEnvironments, setShowOtherEnvironments] = useState(false);
 
   const firstErrorRef = useRef<HTMLDivElement | null>(null);
   /** Parent passes an inline handler; keep latest without re-running the load-workflow effect. */
@@ -408,6 +411,168 @@ export function ComfyGenerateDialog({
   const emptyOptionalCount = 0; // all inputs are required
   const firstTextInput = inputs.find((i) => i.kind === 'textarea' || i.kind === 'text');
 
+  // ── Scene-linked reference image filtering (B7.5) ─────────────────────────
+
+  const sceneCharacterIds = new Set((scene.characters ?? []).map((c) => c.id));
+  const sceneLinkedCharacters = characters.filter((c) => sceneCharacterIds.has(c.id));
+  const otherCharacters = characters.filter((c) => !sceneCharacterIds.has(c.id));
+
+  const sceneEnvironmentId = scene.environment?.id ?? null;
+  const sceneLinkedEnvironments = sceneEnvironmentId
+    ? environments.filter((e) => e.id === sceneEnvironmentId)
+    : [];
+  const otherEnvironments = environments.filter((e) => e.id !== sceneEnvironmentId);
+
+  function renderCharImgs(
+    charList: Character[],
+    label: string,
+    nodeId: string,
+    mode: 'image_url' | 'image',
+    collapsible?: { isOpen: boolean; onToggle: () => void; ariaLabel: string },
+  ) {
+    if (!charList.some((c) => (c.images?.length ?? 0) > 0)) return null;
+    const thumbs = (
+      <div className="flex flex-wrap gap-1.5">
+        {charList.flatMap((c) =>
+          (c.images ?? []).map((img) => {
+            if (!img.image?.url) return [];
+            const isSelected =
+              mode === 'image_url' && String(inputValues[nodeId] ?? '') === img.image.url;
+            const handleClick =
+              mode === 'image_url'
+                ? () => setInputValue(nodeId, img.image.url)
+                : async () => {
+                    const match = img.image.url.match(/\/api\/outputs\/(.+)$/);
+                    if (match?.[1]) {
+                      setFilePaths((prev) => ({ ...prev, [nodeId]: match[1] }));
+                      clearFieldError(nodeId);
+                    }
+                    setFileDataUrls((prev) => ({ ...prev, [nodeId]: img.image.url }));
+                  };
+            return (
+              <button
+                key={img.id}
+                type="button"
+                onClick={handleClick}
+                className={`h-9 w-9 overflow-hidden rounded-md border transition-colors ${
+                  isSelected
+                    ? 'border-violet-500 ring-1 ring-violet-500/60'
+                    : 'border-white/10 hover:border-violet-500/40'
+                }`}
+                title={`${c.name} · ${img.kind.toLowerCase()}`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={img.image.url} alt={c.name} className="h-full w-full object-cover" />
+              </button>
+            );
+          }),
+        )}
+      </div>
+    );
+    if (collapsible) {
+      return (
+        <div className="space-y-1">
+          <button
+            type="button"
+            onClick={collapsible.onToggle}
+            aria-expanded={collapsible.isOpen}
+            aria-label={collapsible.ariaLabel}
+            className="flex items-center gap-1 text-[10px] text-muted-foreground/50 hover:text-muted-foreground/70 transition-colors"
+          >
+            {collapsible.isOpen ? (
+              <ChevronDown className="h-3 w-3" />
+            ) : (
+              <ChevronRight className="h-3 w-3" />
+            )}
+            {label}
+          </button>
+          {collapsible.isOpen && thumbs}
+        </div>
+      );
+    }
+    return (
+      <div className="space-y-1">
+        <p className="text-[10px] text-muted-foreground/50">{label}</p>
+        {thumbs}
+      </div>
+    );
+  }
+
+  function renderEnvImgs(
+    envList: Environment[],
+    label: string,
+    nodeId: string,
+    mode: 'image_url' | 'image',
+    collapsible?: { isOpen: boolean; onToggle: () => void; ariaLabel: string },
+  ) {
+    if (!envList.some((e) => (e.images?.length ?? 0) > 0)) return null;
+    const thumbs = (
+      <div className="flex flex-wrap gap-1.5">
+        {envList.flatMap((e: Environment) =>
+          (e.images ?? []).map((img: EnvironmentImage) => {
+            if (!img.image?.url) return [];
+            const isSelected =
+              mode === 'image_url' && String(inputValues[nodeId] ?? '') === img.image.url;
+            const handleClick =
+              mode === 'image_url'
+                ? () => setInputValue(nodeId, img.image.url)
+                : async () => {
+                    const match = img.image.url.match(/\/api\/outputs\/(.+)$/);
+                    if (match?.[1]) {
+                      setFilePaths((prev) => ({ ...prev, [nodeId]: match[1] }));
+                      clearFieldError(nodeId);
+                    }
+                    setFileDataUrls((prev) => ({ ...prev, [nodeId]: img.image.url }));
+                  };
+            return (
+              <button
+                key={img.id}
+                type="button"
+                onClick={handleClick}
+                className={`h-9 w-9 overflow-hidden rounded-md border transition-colors ${
+                  isSelected
+                    ? 'border-violet-500 ring-1 ring-violet-500/60'
+                    : 'border-white/10 hover:border-violet-500/40'
+                }`}
+                title={`${e.name} · ${img.kind.toLowerCase()}`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={img.image.url} alt={e.name} className="h-full w-full object-cover" />
+              </button>
+            );
+          }),
+        )}
+      </div>
+    );
+    if (collapsible) {
+      return (
+        <div className="space-y-1">
+          <button
+            type="button"
+            onClick={collapsible.onToggle}
+            aria-expanded={collapsible.isOpen}
+            aria-label={collapsible.ariaLabel}
+            className="flex items-center gap-1 text-[10px] text-muted-foreground/50 hover:text-muted-foreground/70 transition-colors"
+          >
+            {collapsible.isOpen ? (
+              <ChevronDown className="h-3 w-3" />
+            ) : (
+              <ChevronRight className="h-3 w-3" />
+            )}
+            {label}
+          </button>
+          {collapsible.isOpen && thumbs}
+        </div>
+      );
+    }
+    return (
+      <div className="space-y-1">
+        <p className="text-[10px] text-muted-foreground/50">{label}</p>
+        {thumbs}
+      </div>
+    );
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -625,39 +790,15 @@ export function ComfyGenerateDialog({
                             {/* Character image picker (for image URL) */}
                             {characters.length > 0 &&
                               characters.some((c) => c.images && c.images.length > 0) && (
-                                <div className="space-y-1">
-                                  <p className="text-[10px] text-muted-foreground/50">Or use character image:</p>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {characters.flatMap((c) =>
-                                      (c.images ?? []).map((img) => {
-                                        if (!img.image?.url) return [];
-                                        const isSelected =
-                                          String(inputValues[inp.nodeId] ?? '') === img.image.url;
-                                        return (
-                                          <button
-                                            key={img.id}
-                                            type="button"
-                                            onClick={() => {
-                                              setInputValue(inp.nodeId, img.image.url);
-                                            }}
-                                            className={`h-9 w-9 overflow-hidden rounded-md border transition-colors ${
-                                              isSelected
-                                                ? 'border-violet-500 ring-1 ring-violet-500/60'
-                                                : 'border-white/10 hover:border-violet-500/40'
-                                            }`}
-                                            title={`${c.name} · ${img.kind.toLowerCase()}`}
-                                          >
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img
-                                              src={img.image.url}
-                                              alt={c.name}
-                                              className="h-full w-full object-cover"
-                                            />
-                                          </button>
-                                        );
-                                      }),
-                                    )}
-                                  </div>
+                                <div className="space-y-2">
+                                  {sceneLinkedCharacters.length > 0 ? (
+                                    <>
+                                      {renderCharImgs(sceneLinkedCharacters, 'Scene cast', inp.nodeId, 'image_url')}
+                                      {renderCharImgs(otherCharacters, 'Other characters', inp.nodeId, 'image_url', { isOpen: showOtherCharacters, onToggle: () => setShowOtherCharacters((v) => !v), ariaLabel: 'Toggle other characters' })}
+                                    </>
+                                  ) : (
+                                    renderCharImgs(characters, 'Character images', inp.nodeId, 'image_url')
+                                  )}
                                 </div>
                               )}
 
@@ -665,39 +806,15 @@ export function ComfyGenerateDialog({
                             {environments.length > 0 &&
                               environments.some((e: Environment) => e.images && e.images.length > 0) &&
                               !['number', 'text', 'textarea'].includes(inp.kind) && (
-                                <div className="space-y-1">
-                                  <p className="text-[10px] text-muted-foreground/50">Or use environment image:</p>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {environments.flatMap((e: Environment) =>
-                                      (e.images ?? []).map((img: EnvironmentImage) => {
-                                        if (!img.image?.url) return [];
-                                        const isSelected =
-                                          String(inputValues[inp.nodeId] ?? '') === img.image.url;
-                                        return (
-                                          <button
-                                            key={img.id}
-                                            type="button"
-                                            onClick={() => {
-                                              setInputValue(inp.nodeId, img.image.url);
-                                            }}
-                                            className={`h-9 w-9 overflow-hidden rounded-md border transition-colors ${
-                                              isSelected
-                                                ? 'border-violet-500 ring-1 ring-violet-500/60'
-                                                : 'border-white/10 hover:border-violet-500/40'
-                                            }`}
-                                            title={`${e.name} · ${img.kind.toLowerCase()}`}
-                                          >
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img
-                                              src={img.image.url}
-                                              alt={e.name}
-                                              className="h-full w-full object-cover"
-                                            />
-                                          </button>
-                                        );
-                                      }),
-                                    )}
-                                  </div>
+                                <div className="space-y-2">
+                                  {sceneLinkedEnvironments.length > 0 ? (
+                                    <>
+                                      {renderEnvImgs(sceneLinkedEnvironments, 'Scene location', inp.nodeId, 'image_url')}
+                                      {renderEnvImgs(otherEnvironments, 'Other environments', inp.nodeId, 'image_url', { isOpen: showOtherEnvironments, onToggle: () => setShowOtherEnvironments((v) => !v), ariaLabel: 'Toggle other environments' })}
+                                    </>
+                                  ) : (
+                                    renderEnvImgs(environments, 'Environment images', inp.nodeId, 'image_url')
+                                  )}
                                 </div>
                               )}
 
@@ -808,45 +925,15 @@ export function ComfyGenerateDialog({
                             {/* Character image picker */}
                             {characters.length > 0 &&
                               characters.some((c) => c.images && c.images.length > 0) && (
-                                <div className="space-y-1">
-                                  <p className="text-[10px] text-muted-foreground/50">Or use character image:</p>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {characters.flatMap((c) =>
-                                      (c.images ?? []).map((img) => {
-                                        if (!img.image?.url) return [];
-
-                                        return (
-                                          <button
-                                            key={img.id}
-                                            type="button"
-                                            onClick={async () => {
-                                              const match = img.image.url.match(/\/api\/outputs\/(.+)$/);
-                                              if (match?.[1]) {
-                                                const relPath = match[1];
-                                                setFilePaths((prev) => ({ ...prev, [inp.nodeId]: relPath }));
-                                                clearFieldError(inp.nodeId);
-                                              }
-
-                                              // For preview we can use the served URL directly
-                                              setFileDataUrls((prev) => ({
-                                                ...prev,
-                                                [inp.nodeId]: img.image.url,
-                                              }));
-                                            }}
-                                            className="h-9 w-9 overflow-hidden rounded-md border border-white/10 hover:border-violet-500/40 transition-colors"
-                                            title={`${c.name} · ${img.kind.toLowerCase()}`}
-                                          >
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img
-                                              src={img.image.url}
-                                              alt={c.name}
-                                              className="h-full w-full object-cover"
-                                            />
-                                          </button>
-                                        );
-                                      }),
-                                    )}
-                                  </div>
+                                <div className="space-y-2">
+                                  {sceneLinkedCharacters.length > 0 ? (
+                                    <>
+                                      {renderCharImgs(sceneLinkedCharacters, 'Scene cast', inp.nodeId, 'image')}
+                                      {renderCharImgs(otherCharacters, 'Other characters', inp.nodeId, 'image', { isOpen: showOtherCharacters, onToggle: () => setShowOtherCharacters((v) => !v), ariaLabel: 'Toggle other characters' })}
+                                    </>
+                                  ) : (
+                                    renderCharImgs(characters, 'Character images', inp.nodeId, 'image')
+                                  )}
                                 </div>
                               )}
 
@@ -886,45 +973,15 @@ export function ComfyGenerateDialog({
                         {environments.length > 0 &&
                           environments.some((e: Environment) => e.images && e.images.length > 0) &&
                           !['number', 'text', 'textarea'].includes(inp.kind) && (
-                            <div className="space-y-1">
-                              <p className="text-[10px] text-muted-foreground/50">Or use environment image:</p>
-                              <div className="flex flex-wrap gap-1.5">
-                                {environments.flatMap((e: Environment) =>
-                                  (e.images ?? []).map((img: EnvironmentImage) => {
-                                    if (!img.image?.url) return [];
-
-                                    return (
-                                      <button
-                                        key={img.id}
-                                        type="button"
-                                        onClick={async () => {
-                                          const match = img.image.url.match(/\/api\/outputs\/(.+)$/);
-                                          if (match?.[1]) {
-                                            const relPath = match[1];
-                                            setFilePaths((prev) => ({ ...prev, [inp.nodeId]: relPath }));
-                                            clearFieldError(inp.nodeId);
-                                          }
-
-                                          // For preview we can use the served URL directly
-                                          setFileDataUrls((prev) => ({
-                                            ...prev,
-                                            [inp.nodeId]: img.image.url,
-                                          }));
-                                        }}
-                                        className="h-9 w-9 overflow-hidden rounded-md border border-white/10 hover:border-violet-500/40 transition-colors"
-                                        title={`${e.name} · ${img.kind.toLowerCase()}`}
-                                      >
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img
-                                          src={img.image.url}
-                                          alt={e.name}
-                                          className="h-full w-full object-cover"
-                                        />
-                                      </button>
-                                    );
-                                  }),
-                                )}
-                              </div>
+                            <div className="space-y-2">
+                              {sceneLinkedEnvironments.length > 0 ? (
+                                <>
+                                  {renderEnvImgs(sceneLinkedEnvironments, 'Scene location', inp.nodeId, 'image')}
+                                  {renderEnvImgs(otherEnvironments, 'Other environments', inp.nodeId, 'image', { isOpen: showOtherEnvironments, onToggle: () => setShowOtherEnvironments((v) => !v), ariaLabel: 'Toggle other environments' })}
+                                </>
+                              ) : (
+                                renderEnvImgs(environments, 'Environment images', inp.nodeId, 'image')
+                              )}
                             </div>
                           )}
 
