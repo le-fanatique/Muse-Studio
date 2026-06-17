@@ -6,7 +6,7 @@ import { newPrefixedId } from '@/lib/server/ids';
 import { getOutputsRoot, normalizeStoredOutputsReference } from '@/lib/server/paths';
 import fs from 'fs';
 import { db } from '@/db';
-import type { Project, Scene, Keyframe, StorylineContent, ImageAsset } from '@/lib/types';
+import type { Project, Scene, Keyframe, StorylineContent, ImageAsset, Character, Environment } from '@/lib/types';
 import { generateStorySuggestions } from '@/lib/actions/muse-agent';
 import { backendClient } from '@/lib/backend-client';
 
@@ -77,6 +77,36 @@ interface ReferenceImageRow {
   alt: string | null;
 }
 
+interface CharacterRow {
+  id: string;
+  project_id: string;
+  name: string;
+  short_bio: string | null;
+  design_notes: string | null;
+  primary_role: string | null;
+  sort_order: number;
+  prompt_positive: string | null;
+  prompt_negative: string | null;
+  tags: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface EnvironmentRow {
+  id: string;
+  project_id: string;
+  name: string;
+  description: string | null;
+  design_notes: string | null;
+  environment_type: string | null;
+  sort_order: number;
+  prompt_positive: string | null;
+  prompt_negative: string | null;
+  tags: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // ─── Mappers ──────────────────────────────────────────────────────────────────
 
 function mapKeyframe(row: KeyframeRow, refs: ReferenceImageRow[]): Keyframe {
@@ -130,6 +160,42 @@ function mapScene(row: SceneRow, keyframes: Keyframe[]): Scene {
   };
 }
 
+function mapLinkedCharacter(row: CharacterRow): Character {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    name: row.name,
+    shortBio: row.short_bio ?? undefined,
+    designNotes: row.design_notes ?? undefined,
+    primaryRole: row.primary_role ?? undefined,
+    sortOrder: row.sort_order,
+    promptPositive: row.prompt_positive ?? undefined,
+    promptNegative: row.prompt_negative ?? undefined,
+    tags: row.tags ? JSON.parse(row.tags) : [],
+    images: [],
+    createdAt: new Date(row.created_at),
+    updatedAt: new Date(row.updated_at),
+  };
+}
+
+function mapLinkedEnvironment(row: EnvironmentRow): Environment {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    name: row.name,
+    description: row.description ?? undefined,
+    designNotes: row.design_notes ?? undefined,
+    environmentType: row.environment_type ?? undefined,
+    sortOrder: row.sort_order,
+    promptPositive: row.prompt_positive ?? undefined,
+    promptNegative: row.prompt_negative ?? undefined,
+    tags: row.tags ? JSON.parse(row.tags) : [],
+    images: [],
+    createdAt: new Date(row.created_at),
+    updatedAt: new Date(row.updated_at),
+  };
+}
+
 function mapProject(row: ProjectRow, scenes: Scene[]): Project {
   const storyline: Project['storyline'] =
     row.storyline_plot_outline
@@ -178,7 +244,29 @@ function loadScenesForProject(projectId: string): Scene[] {
       return mapKeyframe(kfRow, refs);
     });
 
-    return mapScene(sceneRow, keyframes);
+    const characterRows = db
+      .prepare<[string], CharacterRow>(
+        `SELECT c.* FROM characters c
+         JOIN scene_characters sc ON sc.character_id = c.id
+         WHERE sc.scene_id = ?
+         ORDER BY c.sort_order`,
+      )
+      .all(sceneRow.id);
+
+    const envRow = db
+      .prepare<[string], EnvironmentRow>(
+        `SELECT e.* FROM environments e
+         JOIN scene_environments se ON se.environment_id = e.id
+         WHERE se.scene_id = ?
+         LIMIT 1`,
+      )
+      .get(sceneRow.id);
+
+    return {
+      ...mapScene(sceneRow, keyframes),
+      characters: characterRows.map(mapLinkedCharacter),
+      environment: envRow ? mapLinkedEnvironment(envRow) : null,
+    };
   });
 }
 
@@ -211,13 +299,36 @@ export async function getProjectById(id: string): Promise<Project | null> {
   const scenes = loadScenesForProject(id);
   const project = mapProject(row, scenes);
 
-  // Phase 2.5: Sync project to backend for agent data access (fire-and-forget)
-  backendClient
-    .syncProjectToBackend(id, JSON.parse(JSON.stringify(project)))
-    .catch((err) => {
-      // eslint-disable-next-line no-console
-      console.error('[projects] Failed to sync project to backend', { id, err });
-    });
+  // Phase 2.5: Sync project to backend for agent data access (fire-and-forget).
+  // Backend sync is best-effort and must not block the local project UI.
+  // console.warn (not console.error) keeps the terminal informative without
+  // triggering the Next.js dev "Console Error" overlay when the backend is offline.
+  try {
+    // Strip cast/location enrichments — backend schema doesn't expect them.
+    const backendPayload = JSON.parse(JSON.stringify(project)) as Record<string, unknown>;
+    if (Array.isArray(backendPayload.scenes)) {
+      backendPayload.scenes = (backendPayload.scenes as Record<string, unknown>[]).map(
+        ({ characters: _c, environment: _e, ...rest }) => rest,
+      );
+    }
+    backendClient
+      .syncProjectToBackend(id, backendPayload)
+      .catch((err: unknown) => {
+        const name = err instanceof Error ? err.name : 'unknown';
+        const msg = err instanceof Error ? err.message : String(err);
+        const status = (err as { status?: number }).status;
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[projects] backend sync skipped — ${name}: ${msg}${status != null ? ` (HTTP ${status})` : ''}`,
+        );
+      });
+  } catch (err: unknown) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[projects] backend sync skipped — serialization failed:',
+      err instanceof Error ? err.message : String(err),
+    );
+  }
 
   return project;
 }

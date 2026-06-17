@@ -337,6 +337,49 @@ export async function setSceneComfyVideoWorkflow(
   if (row) revalidatePath(`/projects/${row.project_id}`);
 }
 
+// ─── Cast & Location Actions ──────────────────────────────────────────────────
+
+/** Link a character to a scene. No-op if already linked. */
+export async function linkCharacterToScene(
+  sceneId: string,
+  characterId: string,
+  projectId: string,
+): Promise<void> {
+  db.prepare(
+    'INSERT OR IGNORE INTO scene_characters (scene_id, character_id) VALUES (?, ?)',
+  ).run(sceneId, characterId);
+  revalidatePath(`/projects/${projectId}`);
+}
+
+/** Remove a character link from a scene. */
+export async function unlinkCharacterFromScene(
+  sceneId: string,
+  characterId: string,
+  projectId: string,
+): Promise<void> {
+  db.prepare(
+    'DELETE FROM scene_characters WHERE scene_id = ? AND character_id = ?',
+  ).run(sceneId, characterId);
+  revalidatePath(`/projects/${projectId}`);
+}
+
+/** Set (or clear) the primary location for a scene. Replaces any existing link. */
+export async function setSceneEnvironment(
+  sceneId: string,
+  environmentId: string | null,
+  projectId: string,
+): Promise<void> {
+  db.prepare('DELETE FROM scene_environments WHERE scene_id = ?').run(sceneId);
+  if (environmentId) {
+    db.prepare(
+      'INSERT INTO scene_environments (scene_id, environment_id) VALUES (?, ?)',
+    ).run(sceneId, environmentId);
+  }
+  revalidatePath(`/projects/${projectId}`);
+}
+
+// ─── Generation Jobs ──────────────────────────────────────────────────────────
+
 /** Update job status and output path. */
 export async function updateGenerationJob(
   jobId: string,

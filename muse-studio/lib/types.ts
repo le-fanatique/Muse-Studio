@@ -145,6 +145,8 @@ export interface Scene {
   activeMuse?: MuseAgent;
   comfyImageWorkflowId?: string;
   comfyVideoWorkflowId?: string;
+  characters?: Character[];
+  environment?: Environment | null;
   createdAt: Date;
   updatedAt: Date;
 }

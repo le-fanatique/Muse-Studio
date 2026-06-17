@@ -15,6 +15,7 @@ import { KanbanColumn } from './KanbanColumn';
 import { SceneCard } from './SceneCard';
 import { AddSceneDialog } from './AddSceneDialog';
 import { SceneMuseDialog } from './SceneMuseDialog';
+import { SceneCastDialog } from './SceneCastDialog';
 import { VideoReviewDialog } from './VideoReviewDialog';
 import { FinalSceneDialog } from './FinalSceneDialog';
 import { ComfyWorkflowSelectDialog } from './ComfyWorkflowSelectDialog';
@@ -112,6 +113,8 @@ export function KanbanBoard({
   const [comfyGenerateScene, setComfyGenerateScene] = useState<Scene | null>(null);
   const [comfyGenerateKind, setComfyGenerateKind] = useState<'image' | 'video' | null>(null);
   const [comfyGenerateWorkflowId, setComfyGenerateWorkflowId] = useState<string | null>(null);
+
+  const [castScene, setCastScene] = useState<Scene | null>(null);
 
   // sceneId → jobId for background polling of GENERATING scenes
   const [pendingJobs, setPendingJobs] = useState<Record<string, string>>({});
@@ -258,6 +261,10 @@ export function KanbanBoard({
   }
 
   // ── Handlers ──────────────────────────────────────────────────────────────────
+
+  function handleOpenCast(scene: Scene) {
+    setCastScene(scene);
+  }
 
   function handleAskMuse(scene: Scene) {
     setSceneMuseTarget(scene);
@@ -430,6 +437,7 @@ export function KanbanBoard({
               column={column}
               scenes={columnMap[column.id]}
               onAskMuse={handleAskMuse}
+              onCast={handleOpenCast}
               onAddScene={column.id === 'SCRIPT' ? () => setAddSceneOpen(true) : undefined}
               onOpenKeyframe={column.id === 'KEYFRAME' ? handleOpenKeyframePanel : undefined}
               onOpenVideoGenerate={column.id === 'DRAFT_QUEUE' ? handleOpenVideoGenerate : undefined}
@@ -447,6 +455,16 @@ export function KanbanBoard({
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      {/* Cast & Location */}
+      <SceneCastDialog
+        isOpen={!!castScene}
+        scene={castScene}
+        projectId={projectId}
+        characters={characters ?? []}
+        environments={environments ?? []}
+        onClose={() => setCastScene(null)}
+      />
 
       {/* Add Scene */}
       <AddSceneDialog
