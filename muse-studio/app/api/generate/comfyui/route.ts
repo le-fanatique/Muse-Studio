@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getComfyWorkflowJson } from '@/lib/actions/comfyui';
-import { getSetting } from '@/lib/actions/settings';
+import { getSetting, getLLMSettings, getVRAMSettings } from '@/lib/actions/settings';
+import { unloadOllamaBeforeComfyUI } from '@/lib/vram-handoff';
 import { getDecryptedComfyUIApiKey } from '@/lib/comfyui-crypto';
 
 export const dynamic = 'force-dynamic';
@@ -106,6 +107,12 @@ export async function POST(req: NextRequest) {
         { error: 'Failed to decrypt ComfyUI API key. Verify COMFYUI_ENCRYPTION_KEY is set correctly.' },
         { status: 500 },
       );
+    }
+
+    const vramCfg = await getVRAMSettings();
+    const llmCfg = await getLLMSettings();
+    if (vramCfg.unloadOllamaBeforeComfyUI && llmCfg.llmProvider === 'ollama') {
+      await unloadOllamaBeforeComfyUI(llmCfg.ollamaBaseUrl, llmCfg.ollamaModel);
     }
 
     // Use the same backend URL setting as the shared backend client:

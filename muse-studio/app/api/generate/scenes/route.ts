@@ -18,6 +18,8 @@ import {
   sseNamedEvent,
 } from '@/lib/generation/scenesBatchSupport';
 import { logMusePromptDebug } from '@/lib/generation/musePromptDebugLog';
+import { getVRAMSettings, getComfyUIBaseUrl } from '@/lib/actions/settings';
+import { freeComfyUIBeforeLLM } from '@/lib/vram-handoff';
 
 /**
  * POST /api/generate/scenes
@@ -38,59 +40,12 @@ import { logMusePromptDebug } from '@/lib/generation/musePromptDebugLog';
  */
 
 export async function POST(req: NextRequest) {
-  // Read raw body once so we can both log and parse it safely
   const rawBody = await req.text();
-
-  // #region agent log
-  fetch('http://127.0.0.1:7792/ingest/28803232-41f8-4ca2-8286-1055ebb53327', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Debug-Session-Id': 'ccff78',
-    },
-    body: JSON.stringify({
-      sessionId: 'ccff78',
-      runId: 'initial',
-      hypothesisId: 'H1',
-      location: 'app/api/generate/scenes/route.ts:POST:entry',
-      message: 'scenes POST raw body',
-      data: {
-        method: req.method,
-        url: req.url,
-        contentType: req.headers.get('content-type'),
-        contentLength: req.headers.get('content-length'),
-        rawSnippet: rawBody.slice(0, 200),
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
 
   let body: { projectId?: string; targetScenes?: number } = {};
   try {
     body = rawBody ? (JSON.parse(rawBody) as { projectId?: string; targetScenes?: number }) : {};
-  } catch (err) {
-    // #region agent log
-    fetch('http://127.0.0.1:7792/ingest/28803232-41f8-4ca2-8286-1055ebb53327', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Session-Id': 'ccff78',
-      },
-      body: JSON.stringify({
-        sessionId: 'ccff78',
-        runId: 'initial',
-        hypothesisId: 'H2',
-        location: 'app/api/generate/scenes/route.ts:POST:parseError',
-        message: 'Failed to parse scenes POST body as JSON',
-        data: {
-          error: err instanceof Error ? err.message : String(err),
-          rawSnippet: rawBody.slice(0, 200),
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
+  } catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON body for scenes generation' }), {
       status: 400,
     });
@@ -310,6 +265,10 @@ export async function POST(req: NextRequest) {
             missingKeyHint: 'Set OPENROUTER_API_KEY in muse-studio/.env.local.',
           });
         } else {
+          const vramCfg = await getVRAMSettings();
+          if (vramCfg.freeComfyUIBeforeLLM) {
+            await freeComfyUIBeforeLLM(await getComfyUIBaseUrl());
+          }
           generator = generateOllamaText({
             baseUrl: ollamaUrl,
             model: ollamaModel,

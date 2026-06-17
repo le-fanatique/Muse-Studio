@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getProjectById } from '@/lib/actions/projects';
-import { getLLMSettings, getMusePromptSettings } from '@/lib/actions/settings';
+import { getLLMSettings, getMusePromptSettings, getVRAMSettings, getComfyUIBaseUrl } from '@/lib/actions/settings';
+import { freeComfyUIBeforeLLM } from '@/lib/vram-handoff';
 import { MUSE_PROMPT_TASKS } from '@/lib/generation/musePromptDefinitions';
 import { openRouterOptionalHeaders } from '@/lib/generation/openRouterHeaders';
 import {
@@ -111,7 +112,11 @@ export async function POST(req: NextRequest) {
   }
 
   switch (provider_id) {
-    case 'ollama':
+    case 'ollama': {
+      const vramCfg = await getVRAMSettings();
+      if (vramCfg.freeComfyUIBeforeLLM) {
+        await freeComfyUIBeforeLLM(await getComfyUIBaseUrl());
+      }
       await logMusePromptDebug({
         flow: flowForTask(task),
         promptKey: task,
@@ -132,6 +137,7 @@ export async function POST(req: NextRequest) {
         temperature,
         disableThinking: task === 'visual_keyframe_prompt' || task === 'character_visual_prompt',
       });
+    }
 
     case 'openai': {
       const apiKey = process.env.OPENAI_API_KEY ?? '';

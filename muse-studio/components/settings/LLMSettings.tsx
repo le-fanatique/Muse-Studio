@@ -19,8 +19,8 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { saveLLMSettings, saveDebugSettings } from '@/lib/actions/settings';
-import type { LLMSettings as LLMSettingsData, DebugSettings } from '@/lib/actions/settings';
+import { saveLLMSettings, saveDebugSettings, saveVRAMSettings } from '@/lib/actions/settings';
+import type { LLMSettings as LLMSettingsData, DebugSettings, VRAMSettings } from '@/lib/actions/settings';
 
 interface LLMModel {
   name: string;
@@ -37,6 +37,7 @@ interface TestResult {
 interface LLMSettingsProps {
   initialSettings: LLMSettingsData;
   initialDebugSettings: DebugSettings;
+  initialVRAMSettings: VRAMSettings;
 }
 
 const PROVIDER_OPTIONS = [
@@ -181,7 +182,7 @@ function ToggleSwitch({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function LLMSettings({ initialSettings, initialDebugSettings }: LLMSettingsProps) {
+export function LLMSettings({ initialSettings, initialDebugSettings, initialVRAMSettings }: LLMSettingsProps) {
   const router = useRouter();
 
   const [provider, setProvider] = useState(initialSettings.llmProvider);
@@ -198,6 +199,8 @@ export function LLMSettings({ initialSettings, initialDebugSettings }: LLMSettin
     initialSettings.openrouterBaseUrl ?? 'https://openrouter.ai/api/v1',
   );
   const [logPrompts, setLogPrompts] = useState(initialDebugSettings.logPrompts);
+  const [freeComfyUIBeforeLLM, setFreeComfyUIBeforeLLM] = useState(initialVRAMSettings.freeComfyUIBeforeLLM);
+  const [unloadOllamaBeforeComfyUI, setUnloadOllamaBeforeComfyUI] = useState(initialVRAMSettings.unloadOllamaBeforeComfyUI);
 
   const [models, setModels] = useState<LLMModel[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
@@ -224,7 +227,9 @@ export function LLMSettings({ initialSettings, initialDebugSettings }: LLMSettin
     lmstudioModel !== (initialSettings.lmstudioModel ?? 'gpt-4o-mini') ||
     openrouterModel !== (initialSettings.openrouterModel ?? 'openai/gpt-4o-mini') ||
     openrouterBaseUrl !== (initialSettings.openrouterBaseUrl ?? 'https://openrouter.ai/api/v1') ||
-    logPrompts !== initialDebugSettings.logPrompts;
+    logPrompts !== initialDebugSettings.logPrompts ||
+    freeComfyUIBeforeLLM !== initialVRAMSettings.freeComfyUIBeforeLLM ||
+    unloadOllamaBeforeComfyUI !== initialVRAMSettings.unloadOllamaBeforeComfyUI;
 
   // ── Load Ollama models ─────────────────────────────────────────────────────
 
@@ -324,6 +329,7 @@ export function LLMSettings({ initialSettings, initialDebugSettings }: LLMSettin
         openrouterBaseUrl,
       });
       await saveDebugSettings({ logPrompts });
+      await saveVRAMSettings({ freeComfyUIBeforeLLM, unloadOllamaBeforeComfyUI });
 
       // Sync to backend so Video Editor Agent and other LLM consumers use the same provider
       try {
@@ -951,6 +957,48 @@ export function LLMSettings({ initialSettings, initialDebugSettings }: LLMSettin
             checked={logPrompts}
             onCheckedChange={setLogPrompts}
             aria-label="Log Muse prompts in server console"
+          />
+        </div>
+      </section>
+
+      {/* ── VRAM Handoff ──────────────────────────────────────────────────────── */}
+      <section className="rounded-2xl border border-white/8 bg-[oklch(0.13_0.012_264)] p-5 space-y-4">
+        <h2 className="text-sm font-medium flex items-center gap-2">
+          <Terminal className="h-4 w-4 text-muted-foreground" />
+          Local VRAM Handoff
+        </h2>
+        <p className="text-xs text-muted-foreground/60">
+          Opt-in memory management for single-GPU setups. Each operation adds ~1–5 s of latency.
+          Disable if you have enough VRAM to run both Ollama and ComfyUI simultaneously.
+        </p>
+
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm">Free ComfyUI memory before local LLM requests</p>
+            <p className="mt-1 text-xs text-muted-foreground/60">
+              Sends <code className="font-mono text-[11px]">POST /free</code> to ComfyUI before each Ollama generation,
+              unloading its models to reclaim VRAM.
+            </p>
+          </div>
+          <ToggleSwitch
+            checked={freeComfyUIBeforeLLM}
+            onCheckedChange={setFreeComfyUIBeforeLLM}
+            aria-label="Free ComfyUI memory before local LLM requests"
+          />
+        </div>
+
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm">Unload Ollama before ComfyUI generation</p>
+            <p className="mt-1 text-xs text-muted-foreground/60">
+              Sends <code className="font-mono text-[11px]">keep_alive: 0</code> to Ollama before each ComfyUI run,
+              freeing its VRAM for image or video generation.
+            </p>
+          </div>
+          <ToggleSwitch
+            checked={unloadOllamaBeforeComfyUI}
+            onCheckedChange={setUnloadOllamaBeforeComfyUI}
+            aria-label="Unload Ollama before ComfyUI generation"
           />
         </div>
       </section>

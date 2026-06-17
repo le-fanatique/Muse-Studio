@@ -142,6 +142,28 @@ export async function saveDebugSettings(data: DebugSettings): Promise<void> {
   });
 }
 
+// ─── VRAM handoff settings ─────────────────────────────────────────────────────
+
+export interface VRAMSettings {
+  freeComfyUIBeforeLLM: boolean;
+  unloadOllamaBeforeComfyUI: boolean;
+}
+
+export async function getVRAMSettings(): Promise<VRAMSettings> {
+  const all = await getAllSettings();
+  return {
+    freeComfyUIBeforeLLM: all['vram_free_comfyui_before_llm'] === 'true',
+    unloadOllamaBeforeComfyUI: all['vram_unload_ollama_before_comfyui'] === 'true',
+  };
+}
+
+export async function saveVRAMSettings(data: VRAMSettings): Promise<void> {
+  await setSettings({
+    vram_free_comfyui_before_llm: data.freeComfyUIBeforeLLM ? 'true' : 'false',
+    vram_unload_ollama_before_comfyui: data.unloadOllamaBeforeComfyUI ? 'true' : 'false',
+  });
+}
+
 // ─── ComfyUI settings ─────────────────────────────────────────────────────────
 
 export async function getComfyUIBaseUrl(): Promise<string> {
