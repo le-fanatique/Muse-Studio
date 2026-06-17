@@ -136,6 +136,7 @@ export function EnvironmentsPageClient({
   }
 
   async function handleDeleteEnvironment(envId: string) {
+    if (!window.confirm('Delete this environment?')) return;
     startTransition(async () => {
       try {
         await deleteEnvironment(envId);

@@ -27,6 +27,7 @@ import { useStoryMuse } from '@/hooks/useStoryMuse';
 import {
   createCharacter,
   updateCharacter,
+  deleteCharacter,
   addCharacterImage,
   deleteCharacterImage,
 } from '@/lib/actions/characters';
@@ -150,6 +151,19 @@ export function CharactersPageClient({
         setSelectedId(created.id);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to create character.');
+      }
+    });
+  }
+
+  async function handleDeleteCharacter(characterId: string) {
+    if (!window.confirm('Delete this character?')) return;
+    startTransition(async () => {
+      try {
+        await deleteCharacter(characterId);
+        setCharacters((prev) => prev.filter((c) => c.id !== characterId));
+        if (selectedId === characterId) setSelectedId(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to delete character.');
       }
     });
   }
@@ -565,6 +579,16 @@ export function CharactersPageClient({
                     onClick={() => { setSelectedId(null); setIsEditingDetails(false); }}
                   >
                     New character
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                    disabled={isPending}
+                    onClick={() => handleDeleteCharacter(selectedCharacter.id)}
+                  >
+                    Delete
                   </Button>
                 </div>
               </div>

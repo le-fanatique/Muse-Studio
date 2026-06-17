@@ -1,5 +1,6 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
 import { db } from '@/db';
 import type {
   Environment,
@@ -202,7 +203,11 @@ export async function updateEnvironment(id: string, data: UpdateEnvironmentInput
 }
 
 export async function deleteEnvironment(id: string): Promise<void> {
+  const row = db
+    .prepare<[string], { project_id: string }>('SELECT project_id FROM environments WHERE id = ?')
+    .get(id);
   db.prepare('DELETE FROM environments WHERE id = ?').run(id);
+  if (row) revalidatePath(`/projects/${row.project_id}`);
 }
 
 interface AddEnvironmentImageInput {

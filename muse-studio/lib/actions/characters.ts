@@ -1,5 +1,6 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
 import { db } from '@/db';
 import type {
   Character,
@@ -249,7 +250,11 @@ export async function updateCharacter(id: string, data: UpdateCharacterInput): P
 }
 
 export async function deleteCharacter(id: string): Promise<void> {
+  const row = db
+    .prepare<[string], { project_id: string }>('SELECT project_id FROM characters WHERE id = ?')
+    .get(id);
   db.prepare('DELETE FROM characters WHERE id = ?').run(id);
+  if (row) revalidatePath(`/projects/${row.project_id}`);
 }
 
 interface AddCharacterImageInput {
